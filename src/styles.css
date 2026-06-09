@@ -1,0 +1,283 @@
+/* Adam Deck — calm, muted, lots of whitespace. The two project cards' NEXT
+   ACTION lines and the Today column are the only things that "speak"; every-
+   thing else stays quiet. */
+
+:root {
+  --bg: #f5f3ef;
+  --surface: #ffffff;
+  --surface-quiet: #faf8f4;
+  --ink: #2d2b27;
+  --ink-soft: #5c574e;
+  --muted: #948e83;
+  --faint: #b7b1a6;
+  --line: #e8e3da;
+  --line-soft: #efeae1;
+  --accent: #6f7d63;        /* muted sage — used sparingly */
+  --accent-soft: #eef1e9;
+  --focal: #b9762f;         /* warm clay — only the NEXT ACTION + Today */
+  --danger: #a4503f;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(45, 43, 39, 0.04), 0 8px 24px rgba(45, 43, 39, 0.05);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; margin: 0; }
+
+button { font-family: inherit; cursor: pointer; }
+.muted { color: var(--muted); }
+.center { text-align: center; }
+.pad { padding: 48px 0; }
+
+/* --- shell ----------------------------------------------------------------- */
+.app {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 96px;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 24px;
+  margin-bottom: 36px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand-name { font-family: "Fraunces", serif; font-size: 22px; font-weight: 600; }
+.brand-slug {
+  font-size: 12px; color: var(--faint); letter-spacing: 0.08em; text-transform: uppercase;
+}
+.topbar-actions { display: flex; gap: 8px; }
+
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  transition: border-color 0.15s, color 0.15s;
+}
+button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+button.ghost.tiny { padding: 2px 8px; font-size: 12px; margin-left: 10px; }
+
+/* --- deck layout ----------------------------------------------------------- */
+.deck { display: flex; flex-direction: column; gap: 56px; }
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+/* --- project card ---------------------------------------------------------- */
+.project-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 24px 16px;
+  outline: none;
+}
+.card-head:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+.card-project { font-size: 21px; letter-spacing: -0.01em; }
+.card-chevron {
+  font-size: 11px; color: var(--faint); letter-spacing: 0.1em;
+  text-transform: uppercase; border: 1px solid var(--line); border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.card-summary { padding: 0 24px 24px; cursor: pointer; }
+
+.next-action {
+  background: var(--surface-quiet);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--focal);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+.next-label {
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--focal); font-weight: 600; margin-bottom: 6px;
+}
+.next-text {
+  font-family: "Fraunces", serif; font-size: 22px; line-height: 1.3;
+  color: var(--ink); letter-spacing: -0.01em;
+}
+
+.section-label {
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--faint); margin: 0 0 8px;
+}
+.then { margin-bottom: 18px; }
+.then-list {
+  margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 14.5px;
+}
+.then-list li { margin: 4px 0; }
+
+.loop-list { list-style: none; margin: 0; padding: 0; }
+.loop-list li {
+  display: flex; gap: 9px; align-items: baseline;
+  font-size: 14px; color: var(--ink-soft); padding: 3px 0;
+}
+.loop-mark { color: var(--faint); font-size: 11px; }
+.loop-list li.done .loop-text { text-decoration: line-through; color: var(--faint); }
+
+.card-full { padding: 4px 24px 28px; }
+
+/* --- rendered markdown (expanded card) ------------------------------------- */
+.markdown { color: var(--ink-soft); font-size: 15px; }
+.markdown h1 { font-size: 24px; color: var(--ink); margin: 8px 0 4px; }
+.markdown h2 {
+  font-size: 16px; color: var(--ink); margin: 24px 0 8px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line-soft);
+}
+.markdown h3 { font-size: 15px; color: var(--ink); margin: 18px 0 6px; }
+.markdown p { margin: 8px 0; }
+.markdown ul, .markdown ol { margin: 8px 0; padding-left: 22px; }
+.markdown li { margin: 3px 0; }
+.markdown a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+.markdown a:hover { border-bottom-color: var(--accent); }
+.markdown code {
+  background: var(--surface-quiet); padding: 1px 5px; border-radius: 4px;
+  font-size: 0.88em;
+}
+.markdown hr { border: none; border-top: 1px solid var(--line-soft); margin: 20px 0; }
+.markdown em { color: var(--muted); }
+.markdown button.wikilink {
+  background: none; border: none; padding: 0; color: var(--accent);
+  border-bottom: 1px solid var(--accent-soft); font: inherit; cursor: pointer;
+}
+
+/* --- todo board ------------------------------------------------------------ */
+.board-title {
+  font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--faint); font-family: "Inter", sans-serif; font-weight: 600;
+  margin-bottom: 18px;
+}
+.todo-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.todo-col {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 16px 16px 12px;
+  background: transparent;
+}
+/* Today is the focal column: a real surface + a clay accent rule. */
+.todo-col.focal {
+  background: var(--surface);
+  border-color: var(--line);
+  box-shadow: var(--shadow);
+}
+.col-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.col-head h3 { font-size: 16px; color: var(--ink-soft); }
+.todo-col.focal .col-head h3 { color: var(--focal); }
+.col-count { font-size: 12px; color: var(--faint); }
+
+.todo-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.todo {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 4px; border-bottom: 1px solid var(--line-soft);
+}
+.todo:last-of-type { border-bottom: none; }
+.todo-check {
+  background: none; border: none; color: var(--accent);
+  font-size: 14px; line-height: 1; padding: 2px; flex: none;
+}
+.todo-check:disabled { color: var(--faint); cursor: default; }
+.todo-label { flex: 1; font-size: 14px; color: var(--ink); }
+.todo.done .todo-label { text-decoration: line-through; color: var(--faint); }
+.todo.done .todo-check { color: var(--faint); }
+
+.todo-move { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.todo:hover .todo-move, .todo:focus-within .todo-move { opacity: 1; }
+.todo-move button {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 6px; width: 22px; height: 22px; font-size: 14px; line-height: 1;
+  padding: 0;
+}
+.todo-move button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.todo-move button:disabled { opacity: 0.25; cursor: default; }
+
+.todo-empty { font-size: 13px; padding: 6px 4px; }
+
+.add-todo { margin-top: 6px; }
+.add-todo input {
+  width: 100%; border: none; border-top: 1px solid var(--line-soft);
+  background: transparent; padding: 9px 4px 4px; font-size: 14px;
+  color: var(--ink); outline: none;
+}
+.add-todo input::placeholder { color: var(--faint); }
+.add-todo input:focus { border-top-color: var(--accent); }
+
+/* --- error ----------------------------------------------------------------- */
+.error-box {
+  background: #fbf1ee; border: 1px solid #eccfc7; color: var(--danger);
+  border-radius: 10px; padding: 10px 14px; font-size: 13.5px;
+}
+.app-error { margin-bottom: 24px; }
+
+/* --- connect screen -------------------------------------------------------- */
+.config-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.config-card {
+  width: 100%; max-width: 440px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 36px 32px; display: flex; flex-direction: column; gap: 14px;
+}
+.config-card.center { align-items: center; text-align: center; }
+.config-card h1 { font-size: 28px; }
+.config-card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.config-card input {
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+  font-size: 14px; font-family: inherit; color: var(--ink); outline: none;
+}
+.config-card input:focus { border-color: var(--accent); }
+.hint { font-size: 12px; color: var(--faint); }
+.config-card > button[type="submit"] {
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  padding: 11px 16px; font-size: 14px; font-weight: 500;
+}
+.config-card > button[type="submit"]:disabled { opacity: 0.6; cursor: default; }
+.ghost.tiny.link { background: none; border: none; color: var(--muted); text-decoration: underline; align-self: flex-start; padding: 0; }
+.token-fallback { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.token-fallback button { align-self: flex-start; }
+.approve-link { color: var(--accent); }
+.code, code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+/* --- responsive ------------------------------------------------------------ */
+@media (max-width: 760px) {
+  .project-grid { grid-template-columns: 1fr; }
+  .todo-board { grid-template-columns: 1fr; }
+  .todo-move { opacity: 1; } /* no hover on touch — always show */
+}
