@@ -1,6 +1,6 @@
-/* Adam Deck — calm, muted, lots of whitespace. The two project cards' NEXT
-   ACTION lines and the Today column are the only things that "speak"; every-
-   thing else stays quiet. */
+/* Adam Deck — minimal, ADHD-friendly. One note you type into, plus draggable
+   Today / This Week / Later cards, in three switchable designs. Quiet palette,
+   lots of whitespace, Today always gently emphasized. */
 
 :root {
   --bg: #f5f3ef;
@@ -12,9 +12,9 @@
   --faint: #b7b1a6;
   --line: #e8e3da;
   --line-soft: #efeae1;
-  --accent: #6f7d63;        /* muted sage — used sparingly */
+  --accent: #6f7d63;   /* muted sage */
   --accent-soft: #eef1e9;
-  --focal: #b9762f;         /* warm clay — only the NEXT ACTION + Today */
+  --focal: #b9762f;    /* warm clay — Today + emphasis only */
   --danger: #a4503f;
   --radius: 14px;
   --shadow: 0 1px 2px rgba(45, 43, 39, 0.04), 0 8px 24px rgba(45, 43, 39, 0.05);
@@ -35,225 +35,179 @@ html, body {
 }
 
 h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; margin: 0; }
-
 button { font-family: inherit; cursor: pointer; }
 .muted { color: var(--muted); }
 .center { text-align: center; }
-.pad { padding: 48px 0; }
+.pad { padding: 64px 0; }
 
 /* --- shell ----------------------------------------------------------------- */
-.app {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 28px 24px 96px;
-}
+.app { max-width: 1080px; margin: 0 auto; padding: 26px 24px 100px; }
 
 .topbar {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding-bottom: 24px;
-  margin-bottom: 36px;
+  display: flex; align-items: center; gap: 16px;
+  padding-bottom: 18px; margin-bottom: 30px;
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: baseline; gap: 12px; }
-.brand-name { font-family: "Fraunces", serif; font-size: 22px; font-weight: 600; }
-.brand-slug {
-  font-size: 12px; color: var(--faint); letter-spacing: 0.08em; text-transform: uppercase;
-}
-.topbar-actions { display: flex; gap: 8px; }
+.brand { display: flex; align-items: baseline; gap: 10px; flex: 1; }
+.brand-name { font-family: "Fraunces", serif; font-size: 21px; font-weight: 600; }
+.brand-slug { font-size: 11px; color: var(--faint); letter-spacing: 0.08em; text-transform: uppercase; }
 
+.design-switch {
+  display: inline-flex; gap: 2px; background: var(--surface-quiet);
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px;
+}
+.design-tab {
+  border: none; background: transparent; color: var(--muted);
+  padding: 5px 14px; border-radius: 999px; font-size: 13px; font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.design-tab:hover { color: var(--ink-soft); }
+.design-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+.topbar-actions { display: flex; gap: 8px; }
 button.ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--ink-soft);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
+  background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
+  border-radius: 8px; padding: 6px 11px; font-size: 13px;
   transition: border-color 0.15s, color 0.15s;
 }
 button.ghost:hover { border-color: var(--accent); color: var(--accent); }
 button.ghost.tiny { padding: 2px 8px; font-size: 12px; margin-left: 10px; }
 
-/* --- deck layout ----------------------------------------------------------- */
-.deck { display: flex; flex-direction: column; gap: 56px; }
-
-.project-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-/* --- project card ---------------------------------------------------------- */
-.project-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 24px 16px;
-  outline: none;
-}
-.card-head:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-soft); }
-.card-project { font-size: 21px; letter-spacing: -0.01em; }
-.card-chevron {
-  font-size: 11px; color: var(--faint); letter-spacing: 0.1em;
-  text-transform: uppercase; border: 1px solid var(--line); border-radius: 6px;
-  padding: 3px 8px;
-}
-
-.card-summary { padding: 0 24px 24px; cursor: pointer; }
-
-.next-action {
-  background: var(--surface-quiet);
-  border: 1px solid var(--line-soft);
-  border-left: 3px solid var(--focal);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 20px;
-}
-.next-label {
-  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--focal); font-weight: 600; margin-bottom: 6px;
-}
-.next-text {
-  font-family: "Fraunces", serif; font-size: 22px; line-height: 1.3;
-  color: var(--ink); letter-spacing: -0.01em;
-}
-
-.section-label {
-  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--faint); margin: 0 0 8px;
-}
-.then { margin-bottom: 18px; }
-.then-list {
-  margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 14.5px;
-}
-.then-list li { margin: 4px 0; }
-
-.loop-list { list-style: none; margin: 0; padding: 0; }
-.loop-list li {
-  display: flex; gap: 9px; align-items: baseline;
-  font-size: 14px; color: var(--ink-soft); padding: 3px 0;
-}
-.loop-mark { color: var(--faint); font-size: 11px; }
-.loop-list li.done .loop-text { text-decoration: line-through; color: var(--faint); }
-
-.card-full { padding: 4px 24px 28px; }
-
-/* --- rendered markdown (expanded card) ------------------------------------- */
-.markdown { color: var(--ink-soft); font-size: 15px; }
-.markdown h1 { font-size: 24px; color: var(--ink); margin: 8px 0 4px; }
-.markdown h2 {
-  font-size: 16px; color: var(--ink); margin: 24px 0 8px;
-  padding-bottom: 6px; border-bottom: 1px solid var(--line-soft);
-}
-.markdown h3 { font-size: 15px; color: var(--ink); margin: 18px 0 6px; }
-.markdown p { margin: 8px 0; }
-.markdown ul, .markdown ol { margin: 8px 0; padding-left: 22px; }
-.markdown li { margin: 3px 0; }
-.markdown a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
-.markdown a:hover { border-bottom-color: var(--accent); }
-.markdown code {
-  background: var(--surface-quiet); padding: 1px 5px; border-radius: 4px;
-  font-size: 0.88em;
-}
-.markdown hr { border: none; border-top: 1px solid var(--line-soft); margin: 20px 0; }
-.markdown em { color: var(--muted); }
-.markdown button.wikilink {
-  background: none; border: none; padding: 0; color: var(--accent);
-  border-bottom: 1px solid var(--accent-soft); font: inherit; cursor: pointer;
-}
-
-/* --- todo board ------------------------------------------------------------ */
-.board-title {
-  font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--faint); font-family: "Inter", sans-serif; font-weight: 600;
-  margin-bottom: 18px;
-}
-.todo-board {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-.todo-col {
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-  padding: 16px 16px 12px;
-  background: transparent;
-}
-/* Today is the focal column: a real surface + a clay accent rule. */
-.todo-col.focal {
-  background: var(--surface);
-  border-color: var(--line);
-  box-shadow: var(--shadow);
-}
-.col-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 12px;
-}
-.col-head h3 { font-size: 16px; color: var(--ink-soft); }
-.todo-col.focal .col-head h3 { color: var(--focal); }
-.col-count { font-size: 12px; color: var(--faint); }
-
-.todo-list { list-style: none; margin: 0 0 8px; padding: 0; }
-.todo {
-  display: flex; align-items: center; gap: 9px;
-  padding: 7px 4px; border-bottom: 1px solid var(--line-soft);
-}
-.todo:last-of-type { border-bottom: none; }
-.todo-check {
-  background: none; border: none; color: var(--accent);
-  font-size: 14px; line-height: 1; padding: 2px; flex: none;
-}
-.todo-check:disabled { color: var(--faint); cursor: default; }
-.todo-label { flex: 1; font-size: 14px; color: var(--ink); }
-.todo.done .todo-label { text-decoration: line-through; color: var(--faint); }
-.todo.done .todo-check { color: var(--faint); }
-
-.todo-move { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
-.todo:hover .todo-move, .todo:focus-within .todo-move { opacity: 1; }
-.todo-move button {
-  background: none; border: 1px solid var(--line); color: var(--muted);
-  border-radius: 6px; width: 22px; height: 22px; font-size: 14px; line-height: 1;
-  padding: 0;
-}
-.todo-move button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.todo-move button:disabled { opacity: 0.25; cursor: default; }
-
-.todo-empty { font-size: 13px; padding: 6px 4px; }
-
-.add-todo { margin-top: 6px; }
-.add-todo input {
-  width: 100%; border: none; border-top: 1px solid var(--line-soft);
-  background: transparent; padding: 9px 4px 4px; font-size: 14px;
-  color: var(--ink); outline: none;
-}
-.add-todo input::placeholder { color: var(--faint); }
-.add-todo input:focus { border-top-color: var(--accent); }
-
-/* --- error ----------------------------------------------------------------- */
 .error-box {
   background: #fbf1ee; border: 1px solid #eccfc7; color: var(--danger);
   border-radius: 10px; padding: 10px 14px; font-size: 13.5px;
 }
-.app-error { margin-bottom: 24px; }
+.app-error { margin-bottom: 22px; }
 
-/* --- connect screen -------------------------------------------------------- */
-.config-screen {
-  min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-}
-.config-card {
-  width: 100%; max-width: 440px;
+/* --- Active Projects note -------------------------------------------------- */
+.projects-note {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 36px 32px; display: flex; flex-direction: column; gap: 14px;
+  padding: 18px 20px; margin-bottom: 34px;
+}
+.projects-head {
+  display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px;
+}
+.projects-title {
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--focal); font-weight: 600;
+}
+.projects-status { font-size: 11px; color: var(--faint); }
+.projects-textarea {
+  width: 100%; min-height: 132px; resize: vertical; border: none; outline: none;
+  background: transparent; color: var(--ink);
+  font-family: "Fraunces", Georgia, serif; font-size: 17px; line-height: 1.6;
+}
+.projects-textarea::placeholder { color: var(--faint); font-style: italic; }
+.projects-note.compact .projects-textarea { min-height: 84px; font-size: 16px; }
+
+/* --- todo column (shared) -------------------------------------------------- */
+.todo-column {
+  border: 1px solid var(--line-soft); border-radius: var(--radius);
+  padding: 14px 14px 10px; background: transparent;
+}
+.todo-column.focal { background: var(--surface); border-color: var(--line); box-shadow: var(--shadow); }
+.todo-column.drop-armed { border-style: dashed; border-color: var(--accent); }
+
+.column-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.column-head h3 { font-size: 16px; color: var(--ink-soft); }
+.todo-column.focal .column-head h3 { color: var(--focal); }
+.column-count { font-size: 12px; color: var(--faint); }
+
+.column-list { list-style: none; margin: 0 0 8px; padding: 0; min-height: 14px; }
+.column-empty {
+  font-size: 13px; color: var(--faint); padding: 10px 4px;
+  border: 1px dashed transparent;
+}
+.drop-armed .column-empty { border-color: var(--line); border-radius: 8px; text-align: center; }
+
+/* --- todo card (shared) ---------------------------------------------------- */
+.todo-card {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 8px; border-radius: 8px;
+  border: 1px solid transparent; background: var(--surface);
+  margin-bottom: 6px; cursor: grab;
+  box-shadow: 0 1px 1px rgba(45, 43, 39, 0.03);
+}
+.todo-column:not(.focal) .todo-card { background: var(--surface-quiet); }
+.todo-card:active { cursor: grabbing; }
+.todo-card.dragging { opacity: 0.4; }
+.todo-card.done { background: transparent; box-shadow: none; }
+
+.card-check {
+  background: none; border: none; color: var(--accent); font-size: 14px;
+  line-height: 1; padding: 2px; flex: none;
+}
+.card-label { flex: 1; font-size: 14px; color: var(--ink); }
+.todo-card.done .card-label { text-decoration: line-through; color: var(--faint); }
+.todo-card.done .card-check { color: var(--faint); }
+
+.card-tools { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.todo-card:hover .card-tools, .todo-card:focus-within .card-tools { opacity: 1; }
+.card-tools button {
+  background: none; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 6px; width: 22px; height: 22px; font-size: 13px; line-height: 1; padding: 0;
+}
+.card-tools button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.card-tools button:disabled { opacity: 0.25; cursor: default; }
+.card-del:hover:not(:disabled) { border-color: var(--danger) !important; color: var(--danger) !important; }
+
+.add-todo { margin-top: 4px; }
+.add-todo input {
+  width: 100%; border: none; border-top: 1px solid var(--line-soft);
+  background: transparent; padding: 9px 6px 4px; font-size: 14px; color: var(--ink); outline: none;
+}
+.add-todo input::placeholder { color: var(--faint); }
+.add-todo input:focus { border-top-color: var(--accent); }
+
+/* --- Design 1: Calm columns ------------------------------------------------ */
+.calm-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+
+/* --- Design 2: Focus ------------------------------------------------------- */
+.view-focus { max-width: 680px; margin: 0 auto; }
+.focus-today { margin-bottom: 30px; }
+.view-focus .focus-today .todo-column { padding: 20px 20px 14px; }
+.view-focus .focus-today .column-head h3 { font-size: 22px; }
+.view-focus .focus-today .card-label { font-size: 16px; }
+.view-focus .focus-today .todo-card { padding: 12px 10px; }
+.focus-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; opacity: 0.9; }
+.focus-secondary .column-head h3 { font-size: 14px; color: var(--muted); }
+.focus-secondary .todo-card { padding: 7px 8px; }
+.focus-secondary .card-label { font-size: 13px; color: var(--ink-soft); }
+
+/* --- Design 3: Cards (tabbed) ---------------------------------------------- */
+.view-cards { max-width: 620px; margin: 0 auto; }
+.card-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.card-tab {
+  flex: 1; border: 1px solid var(--line); background: var(--surface-quiet);
+  border-radius: 10px; padding: 10px 8px; font-size: 14px; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.15s;
+}
+.card-tab:hover { color: var(--ink-soft); }
+.card-tab.active { background: var(--surface); color: var(--ink); border-color: var(--accent); box-shadow: var(--shadow); }
+.card-tab-count {
+  font-size: 11px; background: var(--accent-soft); color: var(--accent);
+  border-radius: 999px; padding: 1px 7px; min-width: 20px; text-align: center;
+}
+.card-tab.active .card-tab-count { background: var(--accent); color: #fff; }
+
+.view-cards .todo-column { border: none; padding: 0; }
+.view-cards .todo-card {
+  padding: 15px 16px; margin-bottom: 10px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow);
+}
+.view-cards .card-label { font-size: 16px; }
+.view-cards .card-tools { opacity: 1; }
+.view-cards .add-todo input { border: 1px solid var(--line); border-radius: 10px; padding: 13px 14px; margin-top: 4px; }
+.view-cards .add-todo input:focus { border-color: var(--accent); }
+
+/* --- connect screen -------------------------------------------------------- */
+.config-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.config-card {
+  width: 100%; max-width: 440px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px 32px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 .config-card.center { align-items: center; text-align: center; }
 .config-card h1 { font-size: 28px; }
@@ -273,11 +227,12 @@ button.ghost.tiny { padding: 2px 8px; font-size: 12px; margin-left: 10px; }
 .token-fallback { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
 .token-fallback button { align-self: flex-start; }
 .approve-link { color: var(--accent); }
-.code, code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
 /* --- responsive ------------------------------------------------------------ */
 @media (max-width: 760px) {
-  .project-grid { grid-template-columns: 1fr; }
-  .todo-board { grid-template-columns: 1fr; }
-  .todo-move { opacity: 1; } /* no hover on touch — always show */
+  .topbar { flex-wrap: wrap; }
+  .calm-columns { grid-template-columns: 1fr; }
+  .focus-secondary { grid-template-columns: 1fr; }
+  .card-tools { opacity: 1; } /* always show on touch */
 }

@@ -86,8 +86,15 @@ export interface PendingOAuth {
 
 // --- Adam Deck domain --------------------------------------------------------
 
-// The two notes the project cards read from.
-export const STATUS_TAG = "status";
+// "Active Projects (next 2 weeks)" is a single free-text note the user types
+// into directly. It lives at a fixed path and is created on first use if it
+// doesn't exist yet.
+export const DASHBOARD_TAG = "dashboard";
+export const ACTIVE_PROJECTS_PATH = "dashboard/active-projects";
+export const ACTIVE_PROJECTS_SEED =
+  "# Active Projects — Next 2 Weeks\n\n" +
+  "_Type anything here. This is yours — it saves to your vault when you click away._\n\n" +
+  "- \n";
 
 // Each todo is its own note tagged `todo`, with `when` + `done` metadata, living
 // under todos/. The board only ever shows todos that look like board todos (see

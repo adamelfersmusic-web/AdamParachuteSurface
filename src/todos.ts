@@ -8,6 +8,8 @@ export interface Todo {
   label: string;
   when: TodoWhen;
   done: boolean;
+  order: number;
+  createdAt: number;
   updatedAt?: string;
 }
 
@@ -20,10 +22,8 @@ export function isBoardTodo(note: Note): boolean {
   return typeof when === "string" && when.trim() !== "";
 }
 
-// Coerce a free-form `when` value to a column. Board todos created here always
-// carry a valid `when`; the only ones missing it are the pre-existing todos/
-// notes (e.g. "Colombia Trip"), which we park in This Week — visible but not
-// crowding the focal Today column. The user can move them from there.
+// Coerce a free-form `when` value to a column. New todos always carry a valid
+// `when`; pre-existing todos/ notes without one are parked in This Week.
 export function whenOf(note: Note): TodoWhen {
   const raw = note.metadata?.when;
   if (typeof raw === "string") {
@@ -38,6 +38,17 @@ function doneOf(note: Note): boolean {
   if (typeof d === "boolean") return d;
   if (typeof d === "string") return d.toLowerCase() === "true";
   return false;
+}
+
+// Sort key within a column. An explicit `order` number wins; otherwise we fall
+// back to creation time (ms), so untouched columns read in creation order and a
+// dragged column reads in the small 0..n order we renumber it to. New adds use
+// Date.now() so they land at the bottom until the user drags them.
+export function orderOf(note: Note): number {
+  const o = note.metadata?.order;
+  if (typeof o === "number") return o;
+  const t = note.createdAt ? Date.parse(note.createdAt) : 0;
+  return Number.isFinite(t) ? t : 0;
 }
 
 // A readable label: prefer the note's H1 (minus a "TODO:" prefix), else the
@@ -59,11 +70,18 @@ export function toTodo(note: Note): Todo {
     label: labelOf(note),
     when: whenOf(note),
     done: doneOf(note),
+    order: orderOf(note),
+    createdAt: note.createdAt ? Date.parse(note.createdAt) : 0,
     updatedAt: note.updatedAt,
   };
 }
 
-// Filter to board todos and normalize, newest first within a column later.
+// Stable in-column ordering: by order, then creation time as a tiebreak.
+export function byColumnOrder(a: Todo, b: Todo): number {
+  return a.order - b.order || a.createdAt - b.createdAt;
+}
+
+// Filter to board todos and normalize.
 export function boardTodos(notes: Note[]): Todo[] {
   return notes.filter(isBoardTodo).map(toTodo);
 }
@@ -71,11 +89,12 @@ export function boardTodos(notes: Note[]): Todo[] {
 // A filesystem-safe slug for a new todo's path: todos/<slug>-<rand>. The random
 // suffix keeps two todos with the same text from colliding on one path.
 export function todoPath(text: string): string {
-  const slug = text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48) || "todo";
+  const slug =
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "todo";
   const rand = Math.random().toString(36).slice(2, 7);
   return `${TODOS_PATH_PREFIX}${slug}-${rand}`;
 }

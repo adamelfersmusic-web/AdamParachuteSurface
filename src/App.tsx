@@ -10,11 +10,11 @@ import {
   storedFromTokenResponse,
 } from "./oauth";
 import { ConfigScreen } from "./components/ConfigScreen";
-import { ProjectCard } from "./components/ProjectCard";
-import { TodoBoard } from "./components/TodoBoard";
-import { parseStatus, type ParsedStatus } from "./status";
-import { boardTodos, type Todo } from "./todos";
-import { STATUS_TAG, TODO_TAG, type AuthSession } from "./types";
+import { CalmColumnsView } from "./components/views/CalmColumnsView";
+import { FocusView } from "./components/views/FocusView";
+import { CardsView } from "./components/views/CardsView";
+import { useDashboard } from "./useDashboard";
+import type { AuthSession } from "./types";
 
 type OAuthPhase =
   | { kind: "none" }
@@ -66,7 +66,6 @@ export function App() {
       return;
     }
     if (!loadPending()) {
-      // No pending flow (e.g. a stale/bookmarked callback) — fall back to restore.
       const saved = loadSession();
       if (saved) adopt(saved);
       return;
@@ -92,7 +91,6 @@ export function App() {
           setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
         }
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (phase.kind === "completing") {
@@ -127,7 +125,6 @@ export function App() {
   }
 
   if (!auth) {
-    // Surface any OAuth-return error above the form rather than on a dead end.
     return (
       <ConfigScreen
         onConnected={adopt}
@@ -147,43 +144,24 @@ export function App() {
   );
 }
 
+const DESIGNS = [
+  { id: "calm", label: "Calm" },
+  { id: "focus", label: "Focus" },
+  { id: "cards", label: "Cards" },
+] as const;
+type DesignId = (typeof DESIGNS)[number]["id"];
+
 function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () => void }) {
   const api = useMemo(() => new VaultApi(auth), [auth]);
+  const d = useDashboard(api);
 
-  const [statuses, setStatuses] = useState<ParsedStatus[]>([]);
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      // Feature 1: the two status notes, with bodies, for the project cards.
-      // Feature 2: the todo notes, with bodies, for the board (filtered to board
-      // todos so the MASTER lists don't flood it).
-      const [statusNotes, todoNotes] = await Promise.all([
-        api.queryNotes({ tag: STATUS_TAG, includeContent: true }),
-        api.queryNotes({ tag: TODO_TAG, includeContent: true, limit: 300 }),
-      ]);
-      const parsed = statusNotes
-        .filter((n) => n.tags.includes(STATUS_TAG))
-        .map(parseStatus)
-        .sort((a, b) => a.projectName.localeCompare(b.projectName));
-      setStatuses(parsed);
-      setTodos(boardTodos(todoNotes.filter((n) => n.tags.includes(TODO_TAG))));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  const [design, setDesign] = useState<DesignId>(
+    () => (localStorage.getItem("adam-deck.design") as DesignId) || "calm",
+  );
+  function chooseDesign(id: DesignId) {
+    setDesign(id);
+    localStorage.setItem("adam-deck.design", id);
   }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api]);
 
   return (
     <div className="app">
@@ -192,51 +170,41 @@ function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: ()
           <span className="brand-name">Adam Deck</span>
           <span className="brand-slug">{vaultSlug(auth.vaultBase)}</span>
         </div>
+
+        <nav className="design-switch" aria-label="Choose a design">
+          {DESIGNS.map((dz) => (
+            <button
+              key={dz.id}
+              className={`design-tab${design === dz.id ? " active" : ""}`}
+              onClick={() => chooseDesign(dz.id)}
+            >
+              {dz.label}
+            </button>
+          ))}
+        </nav>
+
         <div className="topbar-actions">
-          <button className="ghost" onClick={load} title="Refresh">↻ Refresh</button>
+          <button className="ghost" onClick={d.reload} title="Refresh">↻</button>
           <button className="ghost" onClick={onDisconnect} title="Disconnect">⏻</button>
         </div>
       </header>
 
-      {error && (
+      {d.error && (
         <div className="error-box app-error">
-          {error}
-          <button className="ghost tiny" onClick={() => setError(null)}>dismiss</button>
+          {d.error}
+          <button className="ghost tiny" onClick={d.clearError}>dismiss</button>
         </div>
       )}
 
-      <main className="deck">
-        <section className="projects">
-          {loading && statuses.length === 0 ? (
-            <div className="muted center pad">Loading your projects…</div>
-          ) : statuses.length === 0 ? (
-            <div className="muted center pad">No status notes found (tag: status).</div>
-          ) : (
-            <div className="project-grid">
-              {statuses.map((s) => (
-                <ProjectCard
-                  key={s.note.id}
-                  status={s}
-                  expanded={expandedId === s.note.id}
-                  onToggle={() =>
-                    setExpandedId((cur) => (cur === s.note.id ? null : s.note.id))
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="board-section">
-          <h2 className="board-title">To-do</h2>
-          <TodoBoard
-            todos={todos}
-            api={api}
-            onChanged={load}
-            onError={(m) => setError(m)}
-          />
-        </section>
-      </main>
+      {d.loading && d.todos.length === 0 && !d.projectsContent ? (
+        <div className="muted center pad">Loading your dashboard…</div>
+      ) : design === "focus" ? (
+        <FocusView d={d} />
+      ) : design === "cards" ? (
+        <CardsView d={d} />
+      ) : (
+        <CalmColumnsView d={d} />
+      )}
     </div>
   );
 }
