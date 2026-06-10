@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, type VaultApi } from "./api";
-import { cardFromNote, capturePath, deckPath, isDeckCard, projectTitle, type DeckCard } from "./deck";
+import {
+  cardContent,
+  cardFromNote,
+  capturePath,
+  deckPath,
+  isDeckCard,
+  projectTitle,
+  type DeckCard,
+} from "./deck";
 import { parseUpcoming, type DatedItem } from "./dates";
 import type { Horizon, Note } from "./types";
 import {
   CAPTURE_TAG,
+  DECK_TAG,
   HORIZONS,
   RUNNING_PATH,
   RUNNING_TAG,
@@ -30,6 +39,7 @@ export interface Deck {
   toggleCard: (card: DeckCard) => Promise<void>;
   moveCard: (card: DeckCard, horizon: Horizon) => Promise<void>;
   removeCard: (card: DeckCard) => Promise<void>;
+  saveCardNotes: (card: DeckCard, notes: string) => Promise<void>;
 
   createCapture: (text: string) => Promise<void>;
   appendRunning: (text: string) => Promise<void>;
@@ -114,8 +124,8 @@ export function useDeck(api: VaultApi): Deck {
       api.createNote({
         path: deckPath(body),
         content: `# ${body}\n`,
-        tags: [deckTag(horizon)],
-        metadata: { done: false, order: Date.now() },
+        tags: [DECK_TAG],
+        metadata: { horizon, done: false, order: Date.now() },
       }),
     );
   }
@@ -126,12 +136,12 @@ export function useDeck(api: VaultApi): Deck {
     );
   }
 
+  // Move = a metadata update (reliable on this vault), never a re-tag.
   async function moveCard(card: DeckCard, horizon: Horizon) {
     if (card.horizon === horizon) return;
     await guard(() =>
       api.updateNote(card.id, {
-        tags: [deckTag(horizon)],
-        metadata: { order: Date.now() },
+        metadata: { horizon, order: Date.now() },
         ifUpdatedAt: updatedAt(card.id),
       }),
     );
@@ -139,6 +149,16 @@ export function useDeck(api: VaultApi): Deck {
 
   async function removeCard(card: DeckCard) {
     await guard(() => api.deleteNote(card.id));
+  }
+
+  async function saveCardNotes(card: DeckCard, notes: string) {
+    if (notes === card.notes) return;
+    await guard(() =>
+      api.updateNote(card.id, {
+        content: cardContent(card.text, notes),
+        ifUpdatedAt: updatedAt(card.id),
+      }),
+    );
   }
 
   async function createCapture(text: string) {
@@ -195,8 +215,8 @@ export function useDeck(api: VaultApi): Deck {
       await api.createNote({
         path: deckPath(label),
         content: `# ${label}\n`,
-        tags: [deckTag("today")],
-        metadata: { done: false, order: Date.now() },
+        tags: [DECK_TAG],
+        metadata: { horizon: "today", done: false, order: Date.now() },
       });
       await touch(note);
     });
@@ -240,6 +260,7 @@ export function useDeck(api: VaultApi): Deck {
     toggleCard,
     moveCard,
     removeCard,
+    saveCardNotes,
     createCapture,
     appendRunning,
     writeRunning,
@@ -263,8 +284,11 @@ export function looseEndLabel(note: Note): string {
 // tag does NOT roll its children up on this vault, so a `tag: deck` query
 // returns nothing — we ask for the exact tags we wrote.
 async function loadDeckCards(api: VaultApi): Promise<Note[]> {
+  // Query the flat `deck` tag (current shape) plus the older `deck/<horizon>`
+  // sub-tags so existing cards still load. Merge by id.
+  const tags = [DECK_TAG, ...HORIZONS.map((h) => deckTag(h.key))];
   const lists = await Promise.all(
-    HORIZONS.map((h) => api.queryNotes({ tag: deckTag(h.key), includeContent: true, limit: 200 })),
+    tags.map((t) => api.queryNotes({ tag: t, includeContent: true, limit: 200 })),
   );
   const byId = new Map<string, Note>();
   for (const list of lists) for (const n of list) if (isDeckCard(n)) byId.set(n.id, n);

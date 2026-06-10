@@ -1,3 +1,4 @@
+import { inlineText } from "./deck";
 import type { Note } from "./types";
 
 // Time-blindness anchor: read dated items out of the vault so the deck can SHOW
@@ -66,11 +67,12 @@ function findDate(text: string, now: Date): { date: Date; approx: boolean } | nu
 function labelOf(note: Note): string {
   const h1 = (note.content ?? "").match(/^#[ \t]+(.+?)[ \t]*$/m);
   const base = h1 ? h1[1] : note.title;
-  return base
-    .replace(/^todo:?\s*/i, "")
-    .replace(/\s*[—–-]\s*(june|july|.*\d{4}).*$/i, "")
-    .replace(/\*\*/g, "")
-    .trim();
+  return inlineText(
+    base
+      .replace(/^todo:?\s*/i, "")
+      .replace(/\s*[—–-]\s*(june|july|.*\d{4}).*$/i, "")
+      .replace(/\*\*/g, ""),
+  );
 }
 
 export function parseUpcoming(notes: Note[], now = new Date(), limit = 6): DatedItem[] {

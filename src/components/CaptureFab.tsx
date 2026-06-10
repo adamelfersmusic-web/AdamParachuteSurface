@@ -69,7 +69,7 @@ export function CaptureFab({
                 }
               }}
               placeholder={mode === "dump" ? "Get it out of your head…" : "What do you have to do?"}
-              rows={mode === "dump" ? 4 : 2}
+              rows={mode === "dump" ? 8 : 5}
             />
             <div className="fab-foot">
               <span className="fab-flash">{flash}</span>

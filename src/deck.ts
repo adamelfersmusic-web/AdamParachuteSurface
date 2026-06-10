@@ -1,7 +1,17 @@
 import type { Horizon, Note } from "./types";
 import { DECK_TAG } from "./types";
 
-// A deck card, normalized from its own `deck/<horizon>` note.
+// Collapse real OR literal-escaped newlines/tabs to spaces for single-line
+// display (fixes captured notes showing raw "\n").
+export function inlineText(s: string): string {
+  return s
+    .replace(/\\[nt]/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// A deck card, normalized from its own deck note.
 export interface DeckCard {
   id: string;
   text: string;
@@ -9,15 +19,20 @@ export interface DeckCard {
   done: boolean;
   order: number;
   createdAt: number;
+  notes: string; // scratch space for working the task, stored below the H1
 }
 
-// A note belongs to the deck iff it carries a deck tag. Horizon comes from the
-// `deck/<horizon>` sub-tag.
+// A note belongs to the deck iff it carries a deck tag (flat `deck` or a
+// `deck/<horizon>` sub-tag from the older shape).
 export function isDeckCard(note: Note): boolean {
   return note.tags.some((t) => t === DECK_TAG || t.startsWith(`${DECK_TAG}/`));
 }
 
+// Horizon now lives in metadata (reliable to update); we fall back to an older
+// `deck/<horizon>` sub-tag so existing cards keep working.
 function horizonOf(note: Note): Horizon {
+  const h = note.metadata?.horizon;
+  if (h === "today" || h === "week" || h === "later") return h;
   for (const t of note.tags) {
     if (t === `${DECK_TAG}/today`) return "today";
     if (t === `${DECK_TAG}/week`) return "week";
@@ -28,8 +43,22 @@ function horizonOf(note: Note): Horizon {
 
 function textOf(note: Note): string {
   const m = (note.content ?? "").match(/^#[ \t]+(.+?)[ \t]*$/m);
-  if (m && m[1].trim()) return m[1].trim();
-  return note.title;
+  if (m && m[1].trim()) return inlineText(m[1]);
+  return inlineText(note.title);
+}
+
+// Everything in the card note below its H1 title line — the per-task scratch.
+export function cardNotesBody(content: string): string {
+  const lines = content.split(/\r?\n/);
+  const i = lines.findIndex((l) => /^#[ \t]+/.test(l));
+  if (i === -1) return content.trim();
+  return lines.slice(i + 1).join("\n").trim();
+}
+
+// Rebuild a card note's content from its title + scratch body.
+export function cardContent(title: string, notes: string): string {
+  const body = notes.trim();
+  return body ? `# ${title}\n\n${body}\n` : `# ${title}\n`;
 }
 
 function boolMeta(v: unknown): boolean {
@@ -52,6 +81,7 @@ export function cardFromNote(note: Note): DeckCard {
     done: boolMeta(note.metadata?.done),
     order: orderOf(note),
     createdAt: note.createdAt ? Date.parse(note.createdAt) : 0,
+    notes: cardNotesBody(note.content ?? ""),
   };
 }
 

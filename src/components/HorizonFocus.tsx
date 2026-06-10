@@ -2,13 +2,7 @@ import { useState } from "react";
 import { byOrder, type DeckCard } from "../deck";
 import { HORIZON_LABEL, type Horizon } from "../types";
 import type { Deck } from "../useDeck";
-import { MiniBtn } from "./DeckView";
-
-const OTHERS: Record<Horizon, Horizon[]> = {
-  today: ["week", "later"],
-  week: ["today", "later"],
-  later: ["today", "week"],
-};
+import { MiniBtn, MovePills } from "./DeckView";
 
 // Click a horizon header on the deck → just that list, full screen.
 export function HorizonFocus({
@@ -44,9 +38,7 @@ export function HorizonFocus({
             {!c.done && (
               <span className="row-tools">
                 <MiniBtn title="Right Now" onClick={() => setNow(c)}>◎</MiniBtn>
-                {OTHERS[horizon].map((dest) => (
-                  <MiniBtn key={dest} title={`Move to ${dest}`} onClick={() => d.moveCard(c, dest)}>›</MiniBtn>
-                ))}
+                <MovePills horizon={horizon} onMove={(h) => d.moveCard(c, h)} />
                 <MiniBtn title="Take off deck" onClick={() => d.removeCard(c)}>×</MiniBtn>
               </span>
             )}

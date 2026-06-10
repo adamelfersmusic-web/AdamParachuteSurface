@@ -1,13 +1,27 @@
 import { useState } from "react";
 import { byOrder, type DeckCard } from "../deck";
-import { HORIZONS, type Horizon } from "../types";
+import { HORIZONS, HORIZON_LABEL, type Horizon } from "../types";
 import type { Deck } from "../useDeck";
 
-const OTHERS: Record<Horizon, Horizon[]> = {
+export const OTHERS: Record<Horizon, Horizon[]> = {
   today: ["week", "later"],
   week: ["today", "later"],
   later: ["today", "week"],
 };
+
+// Clear, labelled move controls — "→ Today" / "→ This Week" / "→ Later" — so the
+// action is obvious and the destination unambiguous.
+export function MovePills({ horizon, onMove }: { horizon: Horizon; onMove: (h: Horizon) => void }) {
+  return (
+    <>
+      {OTHERS[horizon].map((dest) => (
+        <button key={dest} className="move-pill" onClick={() => onMove(dest)}>
+          → {HORIZON_LABEL[dest]}
+        </button>
+      ))}
+    </>
+  );
+}
 
 export function DeckView({
   d,
@@ -84,9 +98,7 @@ function Column({
           {!c.done && (
             <span className="row-tools">
               <MiniBtn title="Set as Right Now" onClick={() => setNow(c)}>◎</MiniBtn>
-              {OTHERS[horizon].map((dest) => (
-                <MiniBtn key={dest} title={`Move to ${dest}`} onClick={() => d.moveCard(c, dest)}>›</MiniBtn>
-              ))}
+              <MovePills horizon={horizon} onMove={(h) => d.moveCard(c, h)} />
               <MiniBtn title="Take off deck" onClick={() => d.removeCard(c)}>×</MiniBtn>
             </span>
           )}
