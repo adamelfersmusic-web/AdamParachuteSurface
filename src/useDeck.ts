@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, type VaultApi } from "./api";
 import { cardFromNote, capturePath, deckPath, isDeckCard, type DeckCard } from "./deck";
+import { parseUpcoming, type DatedItem } from "./dates";
 import type { Horizon, Note } from "./types";
 import {
   CAPTURE_TAG,
@@ -8,13 +9,15 @@ import {
   RUNNING_PATH,
   RUNNING_TAG,
   STATUS_TAG,
+  TODO_SCAN_TAG,
+  LOOSE_END_TAGS,
   deckTag,
 } from "./types";
 
-// The deck's whole world. The vault holds everything; this hook reads only the
-// deck's own notes (tag `deck`), the projects (tag `status`), and the one
-// running-list note — never the master to-do lists. Every mutation writes to the
-// vault, then reloads.
+// The deck's whole world. The vault holds everything; this hook reads only what
+// the deck needs — its own cards (tag `deck`), projects (`status`), the one
+// running-list note, plus two READ-ONLY surfaces: dated items for the time strip
+// and `loose-end`/`admin` items for the quiet channel. Never the master lists.
 export interface Deck {
   loading: boolean;
   error: string | null;
@@ -22,20 +25,22 @@ export interface Deck {
   cards: DeckCard[];
   projects: Note[];
   runningContent: string;
+  events: DatedItem[];
+  looseEnd: Note | null; // the single oldest untouched loose end
   reload: () => Promise<void>;
 
-  // deck (clean room)
   addCard: (horizon: Horizon, text: string) => Promise<void>;
   toggleCard: (card: DeckCard) => Promise<void>;
   moveCard: (card: DeckCard, horizon: Horizon) => Promise<void>;
   removeCard: (card: DeckCard) => Promise<void>;
 
-  // capture → vault
   createCapture: (text: string) => Promise<void>;
-
-  // running list (the one note)
   appendRunning: (text: string) => Promise<void>;
   writeRunning: (text: string) => Promise<void>;
+
+  // quiet channel
+  handleLooseEnd: (note: Note) => Promise<void>;
+  dismissLooseEnd: (note: Note) => Promise<void>;
 }
 
 export function useDeck(api: VaultApi): Deck {
@@ -46,17 +51,22 @@ export function useDeck(api: VaultApi): Deck {
   const [runningContent, setRunningContent] = useState("");
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runningUpdatedAt, setRunningUpdatedAt] = useState<string | undefined>();
+  const [events, setEvents] = useState<DatedItem[]>([]);
+  const [looseEnds, setLooseEnds] = useState<Note[]>([]);
   const cardNotes = useState<Map<string, Note>>(() => new Map())[0];
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [deckNotes, statusNotes, running] = await Promise.all([
+      const [deckNotes, statusNotes, running, scanNotes, looseNotes] = await Promise.all([
         api.queryNotes({ tag: DECK_TAG, includeContent: true, limit: 300 }),
         api.queryNotes({ tag: STATUS_TAG, includeContent: true, limit: 50 }),
         loadOrCreateRunning(api),
+        api.queryNotes({ tag: TODO_SCAN_TAG, includeContent: true, limit: 200 }),
+        loadLooseEnds(api),
       ]);
+
       cardNotes.clear();
       const deck = deckNotes.filter(isDeckCard);
       deck.forEach((n) => cardNotes.set(n.id, n));
@@ -65,6 +75,11 @@ export function useDeck(api: VaultApi): Deck {
       setRunningContent(running.content ?? "");
       setRunningId(running.id);
       setRunningUpdatedAt(running.updatedAt);
+      setEvents(parseUpcoming([...scanNotes, ...statusNotes]));
+      // Oldest-touched first — the thing that's been rotting longest.
+      setLooseEnds(
+        looseNotes.sort((a, b) => ts(a.updatedAt) - ts(b.updatedAt)),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -111,17 +126,12 @@ export function useDeck(api: VaultApi): Deck {
 
   async function toggleCard(card: DeckCard) {
     await guard(() =>
-      api.updateNote(card.id, {
-        metadata: { done: !card.done },
-        ifUpdatedAt: updatedAt(card.id),
-      }),
+      api.updateNote(card.id, { metadata: { done: !card.done }, ifUpdatedAt: updatedAt(card.id) }),
     );
   }
 
   async function moveCard(card: DeckCard, horizon: Horizon) {
     if (card.horizon === horizon) return;
-    // Tags are a full replace; a deck card only carries its one deck tag, so we
-    // simply swap it to the new horizon. order resets so it lands at the bottom.
     await guard(() =>
       api.updateNote(card.id, {
         tags: [deckTag(horizon)],
@@ -132,8 +142,6 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   async function removeCard(card: DeckCard) {
-    // Deck cards are disposable curation — the canonical task lives in your
-    // running list / project, so taking it off the deck deletes the little card.
     await guard(() => api.deleteNote(card.id));
   }
 
@@ -154,12 +162,11 @@ export function useDeck(api: VaultApi): Deck {
   async function appendRunning(text: string) {
     const body = text.trim();
     if (!body || !runningId) return;
-    const next = runningContent.trim() ? `${runningContent.replace(/\s+$/, "")}\n- ${body}\n` : `- ${body}\n`;
+    const next = runningContent.trim()
+      ? `${runningContent.replace(/\s+$/, "")}\n- ${body}\n`
+      : `- ${body}\n`;
     try {
-      const updated = await api.updateNote(runningId, {
-        content: next,
-        ifUpdatedAt: runningUpdatedAt,
-      });
+      const updated = await api.updateNote(runningId, { content: next, ifUpdatedAt: runningUpdatedAt });
       setRunningContent(updated.content ?? next);
       setRunningUpdatedAt(updated.updatedAt);
     } catch (e) {
@@ -171,16 +178,39 @@ export function useDeck(api: VaultApi): Deck {
   async function writeRunning(text: string) {
     if (!runningId || text === runningContent) return;
     try {
-      const updated = await api.updateNote(runningId, {
-        content: text,
-        ifUpdatedAt: runningUpdatedAt,
-      });
+      const updated = await api.updateNote(runningId, { content: text, ifUpdatedAt: runningUpdatedAt });
       setRunningContent(updated.content ?? text);
       setRunningUpdatedAt(updated.updatedAt);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       await reload();
     }
+  }
+
+  // Quiet channel. "Touching" a loose end bumps its updated_at, which rotates it
+  // to the back of the oldest-first queue so the next one surfaces.
+  function touch(note: Note) {
+    return api.updateNote(note.id, {
+      metadata: { nudged_at: new Date().toISOString() },
+      ifUpdatedAt: note.updatedAt,
+    });
+  }
+
+  async function handleLooseEnd(note: Note) {
+    const label = looseEndLabel(note);
+    await guard(async () => {
+      await api.createNote({
+        path: deckPath(label),
+        content: `# ${label}\n`,
+        tags: [deckTag("today")],
+        metadata: { done: false, order: Date.now() },
+      });
+      await touch(note);
+    });
+  }
+
+  async function dismissLooseEnd(note: Note) {
+    await guard(() => touch(note));
   }
 
   return {
@@ -190,6 +220,8 @@ export function useDeck(api: VaultApi): Deck {
     cards,
     projects,
     runningContent,
+    events,
+    looseEnd: looseEnds[0] ?? null,
     reload,
     addCard,
     toggleCard,
@@ -198,7 +230,27 @@ export function useDeck(api: VaultApi): Deck {
     createCapture,
     appendRunning,
     writeRunning,
+    handleLooseEnd,
+    dismissLooseEnd,
   };
+}
+
+function ts(s?: string): number {
+  return s ? Date.parse(s) : 0;
+}
+
+export function looseEndLabel(note: Note): string {
+  const m = (note.content ?? "").match(/^#[ \t]+(.+?)[ \t]*$/m);
+  return (m ? m[1] : note.title).replace(/\*\*/g, "").trim();
+}
+
+async function loadLooseEnds(api: VaultApi): Promise<Note[]> {
+  const lists = await Promise.all(
+    LOOSE_END_TAGS.map((t) => api.queryNotes({ tag: t, includeContent: true, limit: 50 })),
+  );
+  const byId = new Map<string, Note>();
+  for (const list of lists) for (const n of list) byId.set(n.id, n);
+  return [...byId.values()];
 }
 
 async function findByTag(api: VaultApi, tag: string): Promise<Note | null> {
@@ -210,12 +262,7 @@ async function loadOrCreateRunning(api: VaultApi): Promise<Note> {
   const existing = await findByTag(api, RUNNING_TAG);
   if (existing) return existing;
   try {
-    return await api.createNote({
-      path: RUNNING_PATH,
-      content: "",
-      tags: [RUNNING_TAG],
-      metadata: {},
-    });
+    return await api.createNote({ path: RUNNING_PATH, content: "", tags: [RUNNING_TAG], metadata: {} });
   } catch (e) {
     if (e instanceof ApiError && (e.status === 409 || e.conflict)) {
       const again = await findByTag(api, RUNNING_TAG);

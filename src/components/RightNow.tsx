@@ -8,8 +8,8 @@ export interface NowTask {
 }
 
 // One thing, full screen. Pick from the deck's open cards (or arrive here with a
-// line pulled from a project). "Done" marks the underlying card done if there is
-// one, then clears.
+// line pulled from a project). The "held" signal is the point: everything else
+// is provably safe to ignore, so the working memory can let go and hyperfocus.
 export function RightNow({
   d,
   nowTask,
@@ -21,6 +21,7 @@ export function RightNow({
 }) {
   const [picking, setPicking] = useState(!nowTask);
   const open = d.cards.filter((c) => !c.done).sort(byOrder);
+  const held = open.filter((c) => c.id !== nowTask?.cardId).length;
 
   function finish() {
     if (nowTask?.cardId) {
@@ -42,6 +43,11 @@ export function RightNow({
           </button>
           <button className="btn-accent" onClick={finish}>Done</button>
         </div>
+        <p className="held-line">
+          {held === 0
+            ? "Nothing else waiting. You're clear."
+            : `${held} other ${held === 1 ? "thing" : "things"} held — you're clear to focus.`}
+        </p>
       </div>
     );
   }
@@ -50,7 +56,7 @@ export function RightNow({
     <div className="now-pick">
       <span className="now-eyebrow">RIGHT NOW</span>
       <h2 className="now-pick-title">Pick the one thing.</h2>
-      {open.length === 0 && <p className="muted">Nothing on the deck. Add something first.</p>}
+      {open.length === 0 && <p className="muted">Nothing on the deck. Flick something in from the pile.</p>}
       {open.map((c) => (
         <button
           key={c.id}
@@ -60,6 +66,9 @@ export function RightNow({
           {c.text}
         </button>
       ))}
+      {open.length > 0 && (
+        <p className="held-line">{open.length} {open.length === 1 ? "thing" : "things"} held and waiting — nothing's lost.</p>
+      )}
     </div>
   );
 }

@@ -108,3 +108,9 @@ export const CAPTURE_TAG = "capture";
 
 // Projects view reads the existing reference notes tagged `status`.
 export const STATUS_TAG = "status";
+
+// READ-ONLY surfaces (never pulled onto the deck automatically):
+// the time strip scans dated items out of these notes...
+export const TODO_SCAN_TAG = "todo";
+// ...and the quiet channel surfaces the oldest of these (one at a time).
+export const LOOSE_END_TAGS = ["loose-end", "admin"];

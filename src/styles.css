@@ -199,8 +199,71 @@ button { font-family: var(--body); cursor: pointer; }
 .approve-link { color: var(--accent); }
 code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
+/* --- time strip (read-only) ------------------------------------------------ */
+.time-strip {
+  display: flex; align-items: center; gap: 10px; overflow-x: auto;
+  padding: 4px 2px 14px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--hair);
+  scrollbar-width: none;
+}
+.time-strip::-webkit-scrollbar { display: none; }
+.time-today {
+  flex: 0 0 auto; font-family: var(--display); font-size: 16px; color: var(--accent);
+  padding-right: 10px; border-right: 1px solid var(--hair);
+}
+.time-empty { font-size: 13px; color: var(--faint); }
+.time-chip { flex: 0 0 auto; display: inline-flex; align-items: baseline; gap: 7px; font-size: 13px; }
+.time-date { color: var(--ink); font-weight: 600; }
+.time-label { color: var(--ink); }
+.time-away { color: var(--faint); font-size: 11.5px; }
+.time-chip + .time-chip { padding-left: 4px; border-left: 1px solid var(--hair); }
+
+/* --- quiet channel --------------------------------------------------------- */
+.quiet-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin: 16px 0 4px; padding: 11px 16px;
+  background: var(--accent-soft); border-radius: 11px;
+}
+.quiet-text { font-size: 14px; color: var(--ink); display: flex; align-items: baseline; gap: 10px; }
+.quiet-eyebrow { font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); }
+.quiet-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.quiet-handle { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 5px 12px; font-size: 12.5px; }
+.quiet-dismiss { background: none; border: none; color: var(--faint); font-size: 12.5px; }
+.quiet-dismiss:hover { color: var(--ink); }
+
+/* --- flick-the-pile entry + held reassurance ------------------------------- */
+.deck-toolbar { margin: 18px 0 14px; }
+.pile-open {
+  background: var(--card); border: 1px solid var(--hair); border-radius: 10px;
+  padding: 10px 16px; font-size: 14px; color: var(--ink); box-shadow: var(--shadow);
+}
+.pile-open:hover { border-color: var(--accent); color: var(--accent); }
+.held-foot { text-align: center; color: var(--faint); font-size: 12.5px; margin-top: 28px; }
+.held-line { color: var(--faint); font-size: 13px; margin-top: 18px; }
+
+/* --- flick rows (drawer) --------------------------------------------------- */
+.flick-row { display: flex; align-items: stretch; gap: 6px; margin-bottom: 7px; }
+.flick-main {
+  flex: 1; display: flex; align-items: center; gap: 10px; text-align: left;
+  background: var(--card); border: 1px solid var(--hair); border-radius: 9px;
+  padding: 11px 12px; font-size: 14px; color: var(--ink); transition: 0.12s;
+}
+.flick-main:hover { border-color: var(--accent); }
+.flick-check { color: var(--accent); width: 14px; flex: 0 0 auto; }
+.flick-text { flex: 1; }
+.flick-tag { font-size: 11px; color: var(--accent); flex: 0 0 auto; }
+.flick-row.pulled .flick-main { background: var(--accent-soft); border-color: transparent; color: var(--faint); }
+.flick-row.pulled .flick-text { text-decoration: none; }
+.flick-alts { display: flex; flex-direction: column; gap: 4px; }
+.flick-alts button {
+  flex: 1; background: none; border: 1px solid var(--hair); border-radius: 7px;
+  color: var(--faint); font-size: 11px; padding: 0 8px;
+}
+.flick-alts button:hover { border-color: var(--accent); color: var(--accent); }
+
 @media (max-width: 760px) {
   .topbar { flex-wrap: wrap; }
   .deck-grid { grid-template-columns: 1fr; }
   .row-tools { opacity: 1; }
+  .quiet-line { flex-direction: column; align-items: flex-start; gap: 8px; }
 }

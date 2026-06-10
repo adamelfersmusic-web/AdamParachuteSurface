@@ -17,6 +17,8 @@ import { ProjectNote } from "./components/ProjectNote";
 import { HorizonFocus } from "./components/HorizonFocus";
 import { CaptureFab, type CaptureMode } from "./components/CaptureFab";
 import { RunningListDrawer } from "./components/RunningListDrawer";
+import { TimeStrip } from "./components/TimeStrip";
+import { QuietLine } from "./components/QuietLine";
 import { useDeck } from "./useDeck";
 import type { DeckCard } from "./deck";
 import type { AuthSession, Horizon, Note } from "./types";
@@ -196,7 +198,25 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
       )}
 
       <main className="main">
-        {view === "deck" && <DeckView d={d} setNow={setNow} openHorizon={setFocusHorizon} />}
+        {view === "deck" && (
+          <>
+            <TimeStrip events={d.events} />
+            <QuietLine
+              note={d.looseEnd}
+              onHandle={d.handleLooseEnd}
+              onDismiss={d.dismissLooseEnd}
+            />
+            <div className="deck-toolbar">
+              <button className="pile-open" onClick={() => setDrawerOpen(true)}>
+                ↧ Flick from the pile
+              </button>
+            </div>
+            <DeckView d={d} setNow={setNow} openHorizon={setFocusHorizon} />
+            <p className="held-foot">
+              Everything you've captured is held in your vault — the deck is only what you chose.
+            </p>
+          </>
+        )}
         {view === "now" && <RightNow d={d} nowTask={nowTask} setNowTask={setNowTask} />}
         {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} />}
       </main>
