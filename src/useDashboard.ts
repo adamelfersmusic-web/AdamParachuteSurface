@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, type VaultApi } from "./api";
 import { boardTodos, byColumnOrder, todoPath, type Todo } from "./todos";
+import type { Note } from "./types";
 import {
   ACTIVE_PROJECTS_PATH,
   ACTIVE_PROJECTS_SEED,
@@ -24,8 +25,6 @@ export interface Dashboard {
   addTodo: (when: TodoWhen, text: string) => Promise<void>;
   toggleDone: (todo: Todo) => Promise<void>;
   deleteTodo: (todo: Todo) => Promise<void>;
-  // Move `id` into column `toWhen` at position `toIndex` (clamped), renumbering
-  // that column to a clean 0..n so the drag order sticks.
   moveTodo: (id: string, toWhen: TodoWhen, toIndex: number) => Promise<void>;
 }
 
@@ -34,10 +33,12 @@ export function useDashboard(api: VaultApi): Dashboard {
   const [error, setError] = useState<string | null>(null);
   const [savingProjects, setSavingProjects] = useState(false);
   const [projectsContent, setProjectsContent] = useState("");
+  // We address the projects note by its real note ID for all writes — looking a
+  // note up by its human path isn't reliable on the vault REST API.
+  const [projectsId, setProjectsId] = useState<string | null>(null);
   const [projectsUpdatedAt, setProjectsUpdatedAt] = useState<string | undefined>();
   const [todos, setTodos] = useState<Todo[]>([]);
 
-  // Fetch the Active Projects note (creating it the first time) and the todos.
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -47,6 +48,7 @@ export function useDashboard(api: VaultApi): Dashboard {
         api.queryNotes({ tag: TODO_TAG, includeContent: true, limit: 300 }),
       ]);
       setProjectsContent(projects.content ?? "");
+      setProjectsId(projects.id);
       setProjectsUpdatedAt(projects.updatedAt);
       setTodos(boardTodos(todoNotes.filter((n) => n.tags.includes(TODO_TAG))));
     } catch (e) {
@@ -77,10 +79,10 @@ export function useDashboard(api: VaultApi): Dashboard {
   }
 
   async function saveProjects(text: string) {
-    if (text === projectsContent) return;
+    if (text === projectsContent || !projectsId) return;
     setSavingProjects(true);
     try {
-      const updated = await api.updateNote(ACTIVE_PROJECTS_PATH, {
+      const updated = await api.updateNote(projectsId, {
         content: text,
         ifUpdatedAt: projectsUpdatedAt,
       });
@@ -102,7 +104,6 @@ export function useDashboard(api: VaultApi): Dashboard {
         path: todoPath(body),
         content: `# ${body}\n`,
         tags: [TODO_TAG],
-        // Date.now() sorts it to the bottom of the column until it's dragged.
         metadata: { when, done: false, order: Date.now() },
       }),
     );
@@ -131,7 +132,6 @@ export function useDashboard(api: VaultApi): Dashboard {
     const idx = Math.max(0, Math.min(toIndex, dest.length));
     dest.splice(idx, 0, moving);
 
-    // Renumber the destination column to 0..n; write only what actually changed.
     const writes: Promise<unknown>[] = [];
     dest.forEach((t, j) => {
       const changedOrder = t.order !== j;
@@ -162,17 +162,38 @@ export function useDashboard(api: VaultApi): Dashboard {
   };
 }
 
-async function loadOrCreateProjects(api: VaultApi) {
+// Find the Active Projects note by tag (reliable), reusing it if it exists and
+// only creating it the first time. We never look it up by path — the REST API
+// resolves single notes by ID, so a path lookup 404s even when the note exists,
+// which previously caused a create→409 conflict loop.
+async function findProjectsNote(api: VaultApi): Promise<Note | null> {
+  const matches = await api.queryNotes({
+    tag: DASHBOARD_TAG,
+    includeContent: true,
+    limit: 50,
+  });
+  return (
+    matches.find((n) => n.path === ACTIVE_PROJECTS_PATH) ??
+    matches.find((n) => n.tags.includes(DASHBOARD_TAG)) ??
+    null
+  );
+}
+
+async function loadOrCreateProjects(api: VaultApi): Promise<Note> {
+  const existing = await findProjectsNote(api);
+  if (existing) return existing;
   try {
-    return await api.getNote(ACTIVE_PROJECTS_PATH);
+    return await api.createNote({
+      path: ACTIVE_PROJECTS_PATH,
+      content: ACTIVE_PROJECTS_SEED,
+      tags: [DASHBOARD_TAG],
+      metadata: {},
+    });
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) {
-      return api.createNote({
-        path: ACTIVE_PROJECTS_PATH,
-        content: ACTIVE_PROJECTS_SEED,
-        tags: [DASHBOARD_TAG],
-        metadata: {},
-      });
+    // Lost a race (or it already existed): fetch and reuse rather than fail.
+    if (e instanceof ApiError && (e.status === 409 || e.conflict)) {
+      const again = await findProjectsNote(api);
+      if (again) return again;
     }
     throw e;
   }
