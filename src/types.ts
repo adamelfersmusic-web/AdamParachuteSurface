@@ -113,3 +113,13 @@ export const COLUMN_LABEL: Record<TodoWhen, string> = {
   "this-week": "This Week",
   later: "Later",
 };
+
+// Off-board sentinel: a todo note whose `when` is this (or anything not in
+// TODO_COLUMNS) is kept in the vault but doesn't show on the board.
+export const WHEN_OFF_BOARD = "";
+
+// What's currently being dragged: an existing board card, or a chip pulled from
+// the master-list drawer (which becomes a new card when dropped).
+export type DragItem =
+  | { kind: "card"; id: string }
+  | { kind: "chip"; text: string };

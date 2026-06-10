@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, type VaultApi } from "./api";
-import { boardTodos, byColumnOrder, todoPath, type Todo } from "./todos";
+import { boardTodos, byColumnOrder, isBoardTodo, todoPath, type Todo } from "./todos";
+import { inboxGroups, type InboxGroup } from "./inbox";
 import type { Note } from "./types";
 import {
   ACTIVE_PROJECTS_PATH,
   ACTIVE_PROJECTS_SEED,
   DASHBOARD_TAG,
   TODO_TAG,
+  WHEN_OFF_BOARD,
   type TodoWhen,
 } from "./types";
 
 // Everything the three dashboard views need: the editable Active Projects note,
-// the todos, and the handful of write operations. All writes go straight to the
-// vault, then we reload so the UI reflects the true server state.
+// the board todos, the pull-from-list inbox, and the write operations. All
+// writes go straight to the vault, then we reload to reflect server state.
 export interface Dashboard {
   loading: boolean;
   error: string | null;
@@ -20,11 +22,13 @@ export interface Dashboard {
   projectsContent: string;
   savingProjects: boolean;
   todos: Todo[];
+  inbox: InboxGroup[];
   reload: () => Promise<void>;
   saveProjects: (text: string) => Promise<void>;
   addTodo: (when: TodoWhen, text: string) => Promise<void>;
   toggleDone: (todo: Todo) => Promise<void>;
-  deleteTodo: (todo: Todo) => Promise<void>;
+  // ✕ — take the card off the board but keep the note in the vault.
+  removeFromBoard: (todo: Todo) => Promise<void>;
   moveTodo: (id: string, toWhen: TodoWhen, toIndex: number) => Promise<void>;
 }
 
@@ -33,11 +37,10 @@ export function useDashboard(api: VaultApi): Dashboard {
   const [error, setError] = useState<string | null>(null);
   const [savingProjects, setSavingProjects] = useState(false);
   const [projectsContent, setProjectsContent] = useState("");
-  // We address the projects note by its real note ID for all writes — looking a
-  // note up by its human path isn't reliable on the vault REST API.
   const [projectsId, setProjectsId] = useState<string | null>(null);
   const [projectsUpdatedAt, setProjectsUpdatedAt] = useState<string | undefined>();
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [inbox, setInbox] = useState<InboxGroup[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -50,7 +53,10 @@ export function useDashboard(api: VaultApi): Dashboard {
       setProjectsContent(projects.content ?? "");
       setProjectsId(projects.id);
       setProjectsUpdatedAt(projects.updatedAt);
-      setTodos(boardTodos(todoNotes.filter((n) => n.tags.includes(TODO_TAG))));
+      const todoTagged = todoNotes.filter((n) => n.tags.includes(TODO_TAG));
+      setTodos(boardTodos(todoTagged));
+      // The drawer = every todo note that ISN'T on the board (master lists etc.).
+      setInbox(inboxGroups(todoTagged.filter((n) => !isBoardTodo(n))));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -118,8 +124,13 @@ export function useDashboard(api: VaultApi): Dashboard {
     );
   }
 
-  async function deleteTodo(todo: Todo) {
-    await guard(() => api.deleteNote(todo.id));
+  async function removeFromBoard(todo: Todo) {
+    await guard(() =>
+      api.updateNote(todo.id, {
+        metadata: { when: WHEN_OFF_BOARD },
+        ifUpdatedAt: todo.updatedAt,
+      }),
+    );
   }
 
   async function moveTodo(id: string, toWhen: TodoWhen, toIndex: number) {
@@ -153,19 +164,16 @@ export function useDashboard(api: VaultApi): Dashboard {
     projectsContent,
     savingProjects,
     todos,
+    inbox,
     reload,
     saveProjects,
     addTodo,
     toggleDone,
-    deleteTodo,
+    removeFromBoard,
     moveTodo,
   };
 }
 
-// Find the Active Projects note by tag (reliable), reusing it if it exists and
-// only creating it the first time. We never look it up by path — the REST API
-// resolves single notes by ID, so a path lookup 404s even when the note exists,
-// which previously caused a create→409 conflict loop.
 async function findProjectsNote(api: VaultApi): Promise<Note | null> {
   const matches = await api.queryNotes({
     tag: DASHBOARD_TAG,
@@ -190,7 +198,6 @@ async function loadOrCreateProjects(api: VaultApi): Promise<Note> {
       metadata: {},
     });
   } catch (e) {
-    // Lost a race (or it already existed): fetch and reuse rather than fail.
     if (e instanceof ApiError && (e.status === 409 || e.conflict)) {
       const again = await findProjectsNote(api);
       if (again) return again;

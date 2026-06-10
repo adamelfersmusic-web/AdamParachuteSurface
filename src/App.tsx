@@ -13,8 +13,10 @@ import { ConfigScreen } from "./components/ConfigScreen";
 import { CalmColumnsView } from "./components/views/CalmColumnsView";
 import { FocusView } from "./components/views/FocusView";
 import { CardsView } from "./components/views/CardsView";
+import { InboxDrawer } from "./components/InboxDrawer";
 import { useDashboard } from "./useDashboard";
-import type { AuthSession } from "./types";
+import type { BoardProps } from "./board";
+import type { AuthSession, DragItem, TodoWhen } from "./types";
 
 type OAuthPhase =
   | { kind: "none" }
@@ -163,6 +165,24 @@ function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: ()
     localStorage.setItem("adam-deck.design", id);
   }
 
+  // Shared drag state so a chip from the drawer can land in a column.
+  const [drag, setDrag] = useState<DragItem | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  function dropInColumn(when: TodoWhen, index: number) {
+    if (drag?.kind === "card") d.moveTodo(drag.id, when, index);
+    else if (drag?.kind === "chip") d.addTodo(when, drag.text);
+    setDrag(null);
+  }
+
+  const board: BoardProps = {
+    d,
+    drag,
+    setDrag,
+    dropInColumn,
+    moveCard: d.moveTodo,
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -184,6 +204,13 @@ function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: ()
         </nav>
 
         <div className="topbar-actions">
+          <button
+            className={`ghost pull-btn${drawerOpen ? " active" : ""}`}
+            onClick={() => setDrawerOpen((o) => !o)}
+            title="Pull from your lists"
+          >
+            ↧ List
+          </button>
           <button className="ghost" onClick={d.reload} title="Refresh">↻</button>
           <button className="ghost" onClick={onDisconnect} title="Disconnect">⏻</button>
         </div>
@@ -196,15 +223,27 @@ function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: ()
         </div>
       )}
 
-      {d.loading && d.todos.length === 0 && !d.projectsContent ? (
-        <div className="muted center pad">Loading your dashboard…</div>
-      ) : design === "focus" ? (
-        <FocusView d={d} />
-      ) : design === "cards" ? (
-        <CardsView d={d} />
-      ) : (
-        <CalmColumnsView d={d} />
-      )}
+      <div className={`deck-wrap${drawerOpen ? " with-drawer" : ""}`}>
+        <div className="deck-main">
+          {d.loading && d.todos.length === 0 && !d.projectsContent ? (
+            <div className="muted center pad">Loading your dashboard…</div>
+          ) : design === "focus" ? (
+            <FocusView {...board} />
+          ) : design === "cards" ? (
+            <CardsView {...board} />
+          ) : (
+            <CalmColumnsView {...board} />
+          )}
+        </div>
+
+        <InboxDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          groups={d.inbox}
+          onPull={d.addTodo}
+          setDrag={setDrag}
+        />
+      </div>
     </div>
   );
 }

@@ -1,16 +1,15 @@
 import type { Todo } from "../../todos";
 
-// A single draggable todo card. Shared across all three designs; the visual
-// differences come from the parent's CSS. Besides drag, it offers ‹ › buttons to
-// hop columns (a fallback that also works on touch, where HTML5 drag is flaky)
-// a checkbox, and an ✕ to delete.
+// A single draggable board card. The ✕ takes it off the board (keeps the note in
+// your vault); the circle marks it done; ‹ › hop it between columns (a fallback
+// that also works on touch, where HTML5 drag is flaky).
 export function TodoCardItem({
   todo,
   canPrev,
   canNext,
   isDragging,
   onToggle,
-  onDelete,
+  onRemove,
   onPrev,
   onNext,
   onDragStart,
@@ -23,7 +22,7 @@ export function TodoCardItem({
   canNext: boolean;
   isDragging: boolean;
   onToggle: () => void;
-  onDelete: () => void;
+  onRemove: () => void;
   onPrev: () => void;
   onNext: () => void;
   onDragStart: () => void;
@@ -58,7 +57,12 @@ export function TodoCardItem({
         <button onClick={onNext} disabled={!canNext} title="Move right" aria-label="Move to next column">
           ›
         </button>
-        <button className="card-del" onClick={onDelete} title="Delete" aria-label="Delete todo">
+        <button
+          className="card-off"
+          onClick={onRemove}
+          title="Take off board (keeps it in your vault)"
+          aria-label="Take off board"
+        >
           ✕
         </button>
       </span>

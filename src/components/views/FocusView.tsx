@@ -1,21 +1,19 @@
-import { useState } from "react";
-import type { Dashboard } from "../../useDashboard";
+import type { BoardProps } from "../../board";
 import { ProjectsNote } from "../ProjectsNote";
 import { TodoColumn } from "../todo/TodoColumn";
 
 // Design 2 — "Focus": one centered column. Today is big and front-and-center;
 // This Week and Later sit quietly underneath so they don't compete for your
-// attention. Built to fight overwhelm — you mostly look at Today. Cards still
-// drag between all three (they're all on screen) and the ‹ › buttons move them.
-export function FocusView({ d }: { d: Dashboard }) {
-  const [dragging, setDragging] = useState<string | null>(null);
+// attention. Cards still drag between all three (they're all on screen).
+export function FocusView({ d, drag, setDrag, dropInColumn, moveCard }: BoardProps) {
   const shared = {
     todos: d.todos,
-    draggingId: dragging,
-    setDraggingId: setDragging,
-    onMove: d.moveTodo,
+    drag,
+    setDrag,
+    onDrop: dropInColumn,
+    moveCard,
     onToggle: d.toggleDone,
-    onDelete: d.deleteTodo,
+    onRemove: d.removeFromBoard,
     onAdd: d.addTodo,
   };
   return (

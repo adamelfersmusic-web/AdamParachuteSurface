@@ -1,35 +1,36 @@
 import { useState } from "react";
 import { byColumnOrder, type Todo } from "../../todos";
-import { COLUMN_LABEL, TODO_COLUMNS, type TodoWhen } from "../../types";
+import { COLUMN_LABEL, TODO_COLUMNS, type DragItem, type TodoWhen } from "../../types";
 import { TodoCardItem } from "./TodoCardItem";
 
 // One column (Today / This Week / Later): its cards plus an add field. Owns the
-// drop targets for drag-and-drop. `draggingId` is shared by the parent view so a
-// card can be dragged from one column into another.
+// drop targets. The active `drag` is shared by the dashboard, so a card can be
+// dragged here from another column AND a chip can be dragged here from the
+// pull-from-list drawer (both resolve through onDrop).
 export function TodoColumn({
   when,
   todos,
-  draggingId,
-  setDraggingId,
-  onMove,
+  drag,
+  setDrag,
+  onDrop,
+  moveCard,
   onToggle,
-  onDelete,
+  onRemove,
   onAdd,
   showHeader = true,
   focal = false,
-  hideDoneCount = false,
 }: {
   when: TodoWhen;
   todos: Todo[];
-  draggingId: string | null;
-  setDraggingId: (id: string | null) => void;
-  onMove: (id: string, when: TodoWhen, index: number) => void;
+  drag: DragItem | null;
+  setDrag: (d: DragItem | null) => void;
+  onDrop: (when: TodoWhen, index: number) => void;
+  moveCard: (id: string, when: TodoWhen, index: number) => void;
   onToggle: (todo: Todo) => void;
-  onDelete: (todo: Todo) => void;
+  onRemove: (todo: Todo) => void;
   onAdd: (when: TodoWhen, text: string) => void;
   showHeader?: boolean;
   focal?: boolean;
-  hideDoneCount?: boolean;
 }) {
   const items = todos.filter((t) => t.when === when).sort(byColumnOrder);
   const open = items.filter((t) => !t.done);
@@ -37,19 +38,15 @@ export function TodoColumn({
   const END = Number.MAX_SAFE_INTEGER;
 
   function dropAt(index: number) {
-    if (draggingId) onMove(draggingId, when, index);
-    setDraggingId(null);
+    onDrop(when, index);
   }
 
   return (
-    <section
-      className={`todo-column${focal ? " focal" : ""}${draggingId ? " drop-armed" : ""}`}
-      data-when={when}
-    >
+    <section className={`todo-column${focal ? " focal" : ""}${drag ? " drop-armed" : ""}`}>
       {showHeader && (
         <header className="column-head">
           <h3>{COLUMN_LABEL[when]}</h3>
-          {!hideDoneCount && <span className="column-count">{open.length}</span>}
+          <span className="column-count">{open.length}</span>
         </header>
       )}
 
@@ -67,13 +64,13 @@ export function TodoColumn({
             todo={todo}
             canPrev={idx > 0}
             canNext={idx < TODO_COLUMNS.length - 1}
-            isDragging={draggingId === todo.id}
+            isDragging={drag?.kind === "card" && drag.id === todo.id}
             onToggle={() => onToggle(todo)}
-            onDelete={() => onDelete(todo)}
-            onPrev={() => onMove(todo.id, TODO_COLUMNS[idx - 1], END)}
-            onNext={() => onMove(todo.id, TODO_COLUMNS[idx + 1], END)}
-            onDragStart={() => setDraggingId(todo.id)}
-            onDragEnd={() => setDraggingId(null)}
+            onRemove={() => onRemove(todo)}
+            onPrev={() => moveCard(todo.id, TODO_COLUMNS[idx - 1], END)}
+            onNext={() => moveCard(todo.id, TODO_COLUMNS[idx + 1], END)}
+            onDragStart={() => setDrag({ kind: "card", id: todo.id })}
+            onDragEnd={() => setDrag(null)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -83,7 +80,7 @@ export function TodoColumn({
           />
         ))}
         {items.length === 0 && (
-          <li className="column-empty">{draggingId ? "Drop here" : "Nothing here yet."}</li>
+          <li className="column-empty">{drag ? "Drop here" : "Nothing here yet."}</li>
         )}
       </ul>
 

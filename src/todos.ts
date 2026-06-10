@@ -13,13 +13,16 @@ export interface Todo {
   updatedAt?: string;
 }
 
-// The crux of the "don't flood the board" rule. The vault's big "MASTER TO-DO
-// LIST" notes are also tagged `todo`; a board todo is one that either carries a
-// `when` metadata field OR lives under todos/. Everything else is ignored.
+// Board membership is now explicit: a card is on the board iff its `when` is one
+// of the three columns. This keeps the big "MASTER TO-DO LIST" notes (no `when`)
+// off the board — they live in the pull-from-list drawer instead — and lets the
+// ✕ button take a card off the board (clear its `when`) without deleting it.
 export function isBoardTodo(note: Note): boolean {
-  if (note.path.toLowerCase().startsWith(TODOS_PATH_PREFIX)) return true;
   const when = note.metadata?.when;
-  return typeof when === "string" && when.trim() !== "";
+  return (
+    typeof when === "string" &&
+    (TODO_COLUMNS as readonly string[]).includes(when.trim().toLowerCase())
+  );
 }
 
 // Coerce a free-form `when` value to a column. New todos always carry a valid
