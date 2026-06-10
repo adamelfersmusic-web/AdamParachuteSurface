@@ -156,10 +156,6 @@ export function useDeck(api: VaultApi): Deck {
     }
   }
 
-  function updatedAt(id: string): string | undefined {
-    return cardNotes.get(id)?.updatedAt;
-  }
-
   async function addCard(tier: Tier, text: string, horizon: Horizon = "week") {
     const body = text.trim();
     if (!body) return;
@@ -174,24 +170,17 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   async function toggleCard(card: DeckCard) {
-    await guard(() =>
-      api.updateNote(card.id, { metadata: { done: !card.done }, ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { metadata: { done: !card.done } }));
   }
 
   async function moveTier(card: DeckCard, tier: Tier) {
     if (card.tier === tier) return;
-    await guard(() =>
-      api.updateNote(card.id, { metadata: { tier, order: Date.now() }, ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { metadata: { tier, order: Date.now() } }));
   }
 
   async function cycleHorizon(card: DeckCard) {
     await guard(() =>
-      api.updateNote(card.id, {
-        metadata: { horizon: NEXT_HORIZON[card.horizon] },
-        ifUpdatedAt: updatedAt(card.id),
-      }),
+      api.updateNote(card.id, { metadata: { horizon: NEXT_HORIZON[card.horizon] } }),
     );
   }
 
@@ -202,16 +191,12 @@ export function useDeck(api: VaultApi): Deck {
   async function saveCardText(card: DeckCard, text: string) {
     const t = text.trim();
     if (!t || t === card.text) return;
-    await guard(() =>
-      api.updateNote(card.id, { content: cardContent(t, card.notes), ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { content: cardContent(t, card.notes) }));
   }
 
   async function saveCardNotes(card: DeckCard, notes: string) {
     if (notes === card.notes) return;
-    await guard(() =>
-      api.updateNote(card.id, { content: cardContent(card.text, notes), ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { content: cardContent(card.text, notes) }));
   }
 
   // Clear the `now` flag from whatever currently holds it (at most a couple).
