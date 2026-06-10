@@ -13,6 +13,7 @@ import { ConfigScreen } from "./components/ConfigScreen";
 import { DeckView } from "./components/DeckView";
 import { RightNow, type NowTask } from "./components/RightNow";
 import { ProjectsView } from "./components/ProjectsView";
+import { ProjectSketch } from "./components/ProjectSketch";
 import { ProjectNote } from "./components/ProjectNote";
 import { HorizonFocus } from "./components/HorizonFocus";
 import { CaptureFab, type CaptureMode } from "./components/CaptureFab";
@@ -158,10 +159,35 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
   const [nowTask, setNowTask] = useState<NowTask | null>(null);
   const [focusHorizon, setFocusHorizon] = useState<Horizon | null>(null);
   const [openProject, setOpenProject] = useState<Note | null>(null);
+  const [sketch, setSketch] = useState<Note | null>(null);
+  const [deepOpen, setDeepOpen] = useState(false);
+
+  // When a project opens, load its sketchpad (the calm default layer).
+  useEffect(() => {
+    let live = true;
+    if (!openProject) {
+      setSketch(null);
+      setDeepOpen(false);
+      return;
+    }
+    setSketch(null);
+    d.loadSketch(openProject).then((s) => {
+      if (live) setSketch(s);
+    });
+    return () => {
+      live = false;
+    };
+  }, [openProject, d]);
 
   function setNow(card: DeckCard) {
     setNowTask({ text: card.text, cardId: card.id });
     setFocusHorizon(null);
+    setView("now");
+  }
+
+  function flickNow(text: string) {
+    setNowTask({ text });
+    setOpenProject(null);
     setView("now");
   }
 
@@ -247,10 +273,22 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
       )}
 
       {openProject && (
+        <ProjectSketch
+          project={openProject}
+          sketch={sketch}
+          onSave={(content) => sketch && d.saveSketch(sketch.id, content).then(setSketch)}
+          onFlickToday={(text) => d.addCard("today", text)}
+          onFlickNow={flickNow}
+          onOpenDeep={() => setDeepOpen(true)}
+          onClose={() => setOpenProject(null)}
+        />
+      )}
+
+      {openProject && deepOpen && (
         <ProjectNote
           note={openProject}
-          onClose={() => setOpenProject(null)}
-          onPullNow={(text) => { setNowTask({ text }); setOpenProject(null); setView("now"); }}
+          onClose={() => setDeepOpen(false)}
+          onPullNow={flickNow}
           onPullDeck={(text) => d.addCard("today", text)}
         />
       )}

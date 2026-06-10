@@ -106,8 +106,11 @@ export const RUNNING_PATH = "running-list";
 // 🧠 Brain Dump → a new note tagged `capture`, fired into the vault.
 export const CAPTURE_TAG = "capture";
 
-// Projects view reads the existing reference notes tagged `status`.
+// Projects view reads the existing reference notes tagged `status` (the "deep
+// note"). Each project also gets a small `sketchpad` note — current/next moves —
+// that opens by default; the deep note is opened on purpose.
 export const STATUS_TAG = "status";
+export const SKETCH_TAG = "sketchpad";
 
 // READ-ONLY surfaces (never pulled onto the deck automatically):
 // the time strip scans dated items out of these notes...

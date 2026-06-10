@@ -151,6 +151,25 @@ button { font-family: var(--body); cursor: pointer; }
 .pull-now { background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 3px 9px; font-size: 11px; }
 .pull-deck { background: var(--accent-soft); color: var(--accent); border: none; border-radius: 7px; padding: 3px 9px; font-size: 11px; }
 
+/* --- project sketchpad (calm default layer) -------------------------------- */
+.sketch-label { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 10px; }
+.sketch-label > span { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--faint); }
+.sketch-edit { background: none; border: none; color: var(--accent); font-size: 12.5px; }
+.sketch-area {
+  width: 100%; min-height: 160px; resize: vertical; border: 1px solid var(--hair);
+  border-radius: 12px; padding: 16px; background: var(--card); outline: none;
+  font-family: var(--display); font-size: 18px; line-height: 1.6; color: var(--ink);
+}
+.sketch-area::placeholder { color: var(--faint); font-style: italic; }
+.sketch-lines { background: var(--card); border: 1px solid var(--hair); border-radius: 12px; padding: 6px; }
+.sketch-line { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-radius: 9px; }
+.sketch-line:hover { background: var(--bg); }
+.sketch-text { flex: 1; font-family: var(--display); font-size: 18px; line-height: 1.4; }
+.sketch-line .line-actions { opacity: 0; }
+.sketch-line:hover .line-actions { opacity: 1; }
+.deep-link { display: inline-block; margin-top: 18px; background: none; border: none; color: var(--faint); font-size: 13px; text-decoration: underline; }
+.deep-link:hover { color: var(--accent); }
+
 /* --- capture fab ----------------------------------------------------------- */
 .fab-scrim { position: fixed; inset: 0; background: rgba(43, 39, 36, 0.28); z-index: 40; }
 .fab-wrap { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
