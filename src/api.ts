@@ -175,7 +175,9 @@ export class VaultApi {
   }
 
   // PATCH with optimistic concurrency. `tags` is a full replace (REST contract);
-  // `metadata` is merged server-side. Pass `ifUpdatedAt` from the note you read.
+  // `metadata` is merged server-side. The vault REQUIRES a precondition on every
+  // update: pass `ifUpdatedAt` from the note you read, OR `force: true` to write
+  // unconditionally (last-write-wins). Omitting both is rejected as a conflict.
   async updateNote(
     idOrPath: string,
     patch: {
@@ -184,6 +186,7 @@ export class VaultApi {
       metadata?: Record<string, unknown>;
       path?: string;
       ifUpdatedAt?: string;
+      force?: boolean;
     },
   ): Promise<Note> {
     const body: Record<string, unknown> = {};
@@ -192,6 +195,7 @@ export class VaultApi {
     if (patch.metadata !== undefined) body.metadata = patch.metadata;
     if (patch.path !== undefined) body.path = patch.path;
     if (patch.ifUpdatedAt) body.if_updated_at = patch.ifUpdatedAt;
+    if (patch.force) body.force = true;
 
     const data = await this.request(`/notes/${encodePathSegment(idOrPath)}`, {
       method: "PATCH",

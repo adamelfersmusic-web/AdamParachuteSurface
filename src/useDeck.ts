@@ -170,17 +170,17 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   async function toggleCard(card: DeckCard) {
-    await guard(() => api.updateNote(card.id, { metadata: { done: !card.done } }));
+    await guard(() => api.updateNote(card.id, { metadata: { done: !card.done }, force: true }));
   }
 
   async function moveTier(card: DeckCard, tier: Tier) {
     if (card.tier === tier) return;
-    await guard(() => api.updateNote(card.id, { metadata: { tier, order: Date.now() } }));
+    await guard(() => api.updateNote(card.id, { metadata: { tier, order: Date.now() }, force: true }));
   }
 
   async function cycleHorizon(card: DeckCard) {
     await guard(() =>
-      api.updateNote(card.id, { metadata: { horizon: NEXT_HORIZON[card.horizon] } }),
+      api.updateNote(card.id, { metadata: { horizon: NEXT_HORIZON[card.horizon] }, force: true }),
     );
   }
 
@@ -191,21 +191,21 @@ export function useDeck(api: VaultApi): Deck {
   async function saveCardText(card: DeckCard, text: string) {
     const t = text.trim();
     if (!t || t === card.text) return;
-    await guard(() => api.updateNote(card.id, { content: cardContent(t, card.notes) }));
+    await guard(() => api.updateNote(card.id, { content: cardContent(t, card.notes), force: true }));
   }
 
   async function saveCardNotes(card: DeckCard, notes: string) {
     if (notes === card.notes) return;
-    await guard(() => api.updateNote(card.id, { content: cardContent(card.text, notes) }));
+    await guard(() => api.updateNote(card.id, { content: cardContent(card.text, notes), force: true }));
   }
 
   // Clear the `now` flag from whatever currently holds it (at most a couple).
-  // No ifUpdatedAt: this is a one-field flag toggle — last write wins, always
-  // land it. A stale ifUpdatedAt here silently 409s and the flag never persists.
+  // force: the vault requires a precondition on every write — force makes this a
+  // last-write-wins toggle that always lands, even after a cross-device edit.
   async function clearAllNow(exceptId?: string) {
     for (const c of cards) {
       if (c.now && c.id !== exceptId) {
-        await api.updateNote(c.id, { metadata: { now: false } });
+        await api.updateNote(c.id, { metadata: { now: false }, force: true });
       }
     }
   }
@@ -213,7 +213,7 @@ export function useDeck(api: VaultApi): Deck {
   async function promoteNow(card: DeckCard) {
     await guard(async () => {
       await clearAllNow(card.id);
-      await api.updateNote(card.id, { metadata: { now: true } });
+      await api.updateNote(card.id, { metadata: { now: true }, force: true });
     });
   }
 
@@ -232,11 +232,11 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   async function markNowDone(card: DeckCard) {
-    await guard(() => api.updateNote(card.id, { metadata: { done: true, now: false } }));
+    await guard(() => api.updateNote(card.id, { metadata: { done: true, now: false }, force: true }));
   }
 
   async function clearNow(card: DeckCard) {
-    await guard(() => api.updateNote(card.id, { metadata: { now: false } }));
+    await guard(() => api.updateNote(card.id, { metadata: { now: false }, force: true }));
   }
 
   async function createCapture(text: string) {
@@ -287,12 +287,12 @@ export function useDeck(api: VaultApi): Deck {
   async function writeNote(
     id: string,
     content: string,
-    prevUpdated: string | undefined,
+    _prevUpdated: string | undefined, // force makes writes unconditional; kept for caller symmetry
     setContent: (s: string) => void,
     setUpdated: (s: string | undefined) => void,
   ) {
     try {
-      const updated = await api.updateNote(id, { content, ifUpdatedAt: prevUpdated });
+      const updated = await api.updateNote(id, { content, force: true });
       setContent(updated.content ?? content);
       setUpdated(updated.updatedAt);
     } catch (e) {
@@ -304,7 +304,7 @@ export function useDeck(api: VaultApi): Deck {
   function touch(note: Note) {
     return api.updateNote(note.id, {
       metadata: { nudged_at: new Date().toISOString() },
-      ifUpdatedAt: note.updatedAt,
+      force: true,
     });
   }
   async function handleLooseEnd(note: Note) {
@@ -336,7 +336,7 @@ export function useDeck(api: VaultApi): Deck {
     );
   }
   function saveWall(id: string, content: string): Promise<Note> {
-    return api.updateNote(id, { content });
+    return api.updateNote(id, { content, force: true });
   }
   function findDeep(wall: Note): Note | null {
     const deep = wall.metadata?.deep;
