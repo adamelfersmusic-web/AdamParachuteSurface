@@ -1,134 +1,115 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { byOrder, type DeckCard } from "../deck";
-import { HORIZONS, HORIZON_LABEL, type Horizon } from "../types";
+import { HORIZON_LABEL, TIERS, type Tier } from "../types";
 import type { Deck } from "../useDeck";
 
-export const OTHERS: Record<Horizon, Horizon[]> = {
-  today: ["week", "later"],
-  week: ["today", "later"],
-  later: ["today", "week"],
-};
-
-// Clear, labelled move controls — "→ Today" / "→ This Week" / "→ Later" — so the
-// action is obvious and the destination unambiguous.
-export function MovePills({ horizon, onMove }: { horizon: Horizon; onMove: (h: Horizon) => void }) {
+// The deck, organized by TYPE + ENERGY: Moves (big), Must-dos (medium), Errands
+// (quiet). Time is a small chip per card. Every card edits inline (tap the text);
+// the ◎ focuses it in Right Now.
+export function DeckView({ d, onFocus }: { d: Deck; onFocus: (card: DeckCard) => void }) {
   return (
-    <>
-      {OTHERS[horizon].map((dest) => (
-        <button key={dest} className="move-pill" onClick={() => onMove(dest)}>
-          → {HORIZON_LABEL[dest]}
-        </button>
-      ))}
-    </>
-  );
-}
-
-export function DeckView({
-  d,
-  setNow,
-  openHorizon,
-}: {
-  d: Deck;
-  setNow: (card: DeckCard) => void;
-  openHorizon: (h: Horizon) => void;
-}) {
-  return (
-    <div className="deck-grid">
-      {HORIZONS.map((h) => (
-        <Column
-          key={h.key}
-          horizon={h.key}
-          label={h.label}
-          cards={d.cards.filter((c) => c.horizon === h.key).sort(byOrder)}
-          d={d}
-          setNow={setNow}
-          openHorizon={openHorizon}
-        />
-      ))}
+    <div className="deck-tiers">
+      {TIERS.map((tier) => {
+        const items = d.cards.filter((c) => c.tier === tier.key).sort(byOrder);
+        const open = items.filter((c) => !c.done).length;
+        return (
+          <section key={tier.key} className={`tier ${tier.key}`}>
+            <div className="tier-head">
+              <span className="tier-name">{tier.label}</span>
+              <span className="energy">{tier.energy}</span>
+              <span className="tier-meta">{tier.meta}</span>
+              <span className="tier-count">{open}</span>
+            </div>
+            {items.length === 0 && <div className="tier-empty">Nothing here.</div>}
+            {items.map((c) => (
+              <CardRow key={c.id} card={c} d={d} onFocus={onFocus} />
+            ))}
+            {tier.key === "move" && open > 3 && (
+              <div className="warn">More than 3 Moves — is the 4th really a Move, or a Must-do?</div>
+            )}
+            <AddCard onAdd={(text) => d.addCard(tier.key, text)} />
+          </section>
+        );
+      })}
     </div>
   );
 }
 
-function Column({
-  horizon,
-  label,
-  cards,
-  d,
-  setNow,
-  openHorizon,
-}: {
-  horizon: Horizon;
-  label: string;
-  cards: DeckCard[];
-  d: Deck;
-  setNow: (card: DeckCard) => void;
-  openHorizon: (h: Horizon) => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const [val, setVal] = useState("");
-  const openCount = cards.filter((c) => !c.done).length;
+function CardRow({ card, d, onFocus }: { card: DeckCard; d: Deck; onFocus: (c: DeckCard) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(card.text);
+  const others = TIERS.filter((t) => t.key !== card.tier);
 
-  function submit() {
-    if (val.trim()) d.addCard(horizon, val.trim());
-    setVal("");
-    setAdding(false);
+  useEffect(() => {
+    if (!editing) setText(card.text);
+  }, [card.text, editing]);
+
+  function commit() {
+    setEditing(false);
+    d.saveCardText(card, text);
   }
 
   return (
-    <section className="column">
-      <div className="column-head">
-        <h2
-          className={`column-title${horizon === "today" ? " accent" : ""}`}
-          onClick={() => openHorizon(horizon)}
-          title="Open just this"
-        >
-          {label}
-        </h2>
-        <button className="column-expand" onClick={() => openHorizon(horizon)} title="Open just this">
-          {openCount} ⤢
-        </button>
-      </div>
-
-      {cards.length === 0 && <p className="column-empty">Nothing here yet.</p>}
-
-      {cards.map((c) => (
-        <div key={c.id} className={`card-row${c.done ? " done" : ""}`}>
-          <button className="dot" onClick={() => d.toggleCard(c)} aria-label="toggle done" />
-          <span className="card-text">{c.text}</span>
-          {!c.done && (
-            <span className="row-tools">
-              <MiniBtn title="Set as Right Now" onClick={() => setNow(c)}>◎</MiniBtn>
-              <MovePills horizon={horizon} onMove={(h) => d.moveCard(c, h)} />
-              <MiniBtn title="Take off deck" onClick={() => d.removeCard(c)}>×</MiniBtn>
-            </span>
-          )}
-        </div>
-      ))}
-
-      {adding ? (
+    <div className={`tcard ${card.tier}${card.done ? " done" : ""}`}>
+      <button className="dot" onClick={() => d.toggleCard(card)} aria-label="toggle done" />
+      {editing ? (
         <input
-          className="add-input"
+          className="tcard-edit"
           autoFocus
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onBlur={submit}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          placeholder="What goes here?"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") { setText(card.text); setEditing(false); }
+          }}
         />
       ) : (
-        <button className="add-btn" onClick={() => setAdding(true)}>+ add</button>
+        <span className="tcard-text" onClick={() => setEditing(true)} title="tap to edit">
+          {card.text}
+        </span>
       )}
-    </section>
+      <button
+        className={`chip${card.horizon === "today" ? " today" : ""}`}
+        onClick={() => d.cycleHorizon(card)}
+        title="change the day"
+      >
+        {HORIZON_LABEL[card.horizon]}
+      </button>
+      {!card.done && (
+        <span className="tcard-tools">
+          <button className="focus-btn" onClick={() => onFocus(card)} title="Focus in Right Now">◎</button>
+          {others.map((o) => (
+            <button key={o.key} className="move-pill" onClick={() => d.moveTier(card, o.key as Tier)}>
+              → {o.label}
+            </button>
+          ))}
+          <button className="del" onClick={() => d.removeCard(card)} title="Take off deck">✕</button>
+        </span>
+      )}
+    </div>
   );
 }
 
-export function MiniBtn({
-  children,
-  ...rest
-}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button className="mini-btn" {...rest}>
-      {children}
-    </button>
+function AddCard({ onAdd }: { onAdd: (text: string) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [val, setVal] = useState("");
+  function submit() {
+    if (val.trim()) onAdd(val.trim());
+    setVal("");
+    setAdding(false);
+  }
+  return adding ? (
+    <input
+      className="add-input"
+      autoFocus
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={submit}
+      onKeyDown={(e) => e.key === "Enter" && submit()}
+      placeholder="What goes here?"
+    />
+  ) : (
+    <button className="add" onClick={() => setAdding(true)}>+ add</button>
   );
 }

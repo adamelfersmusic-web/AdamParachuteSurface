@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { inlineText, pileLines } from "../deck";
-import { HORIZONS } from "../types";
+import { TIERS, type Tier } from "../types";
 import type { Deck } from "../useDeck";
 
-// The morning sorting room — the one room allowed to be denser, because the
-// pile + canvas + card-targets are ONE motion: pull → arrange → commit.
-// Tap a pile line to pull it into the canvas; tap a canvas line to commit it to
-// a column. No drag — reliable, works on mobile.
+// The morning sorting room — the one room allowed to be denser, because pile +
+// canvas + tier-targets are ONE motion: pull → arrange → commit. Tap a pile line
+// to pull it into the canvas; tap a canvas line's tier button to commit it.
 export function WorkspaceView({ d }: { d: Deck }) {
   const pile = pileLines(d.runningContent);
   const [text, setText] = useState(d.scratchContent);
@@ -16,14 +15,10 @@ export function WorkspaceView({ d }: { d: Deck }) {
     if (!dirty.current) setText(d.scratchContent);
   }, [d.scratchContent]);
 
-  function save(next: string) {
-    setText(next);
-    d.saveScratch(next);
-  }
-
   function pull(line: string) {
     const next = (text.trim() ? text.replace(/\s+$/, "") + "\n" : "") + line;
-    save(next);
+    setText(next);
+    d.saveScratch(next);
   }
 
   const commitLines = text
@@ -31,17 +26,15 @@ export function WorkspaceView({ d }: { d: Deck }) {
     .map((l) => inlineText(l.replace(/^[-*]\s+\[[ xX]\]\s+/, "").replace(/^[-*]\s+/, "")))
     .filter((l) => l && !/^#{1,6}\s/.test(l));
 
-  function count(h: "today" | "week" | "later") {
-    return d.cards.filter((c) => !c.done && c.horizon === h).length;
+  function count(tier: Tier) {
+    return d.cards.filter((c) => !c.done && c.tier === tier).length;
   }
 
   return (
     <div className="workspace">
       <div className="ws-targets">
-        {HORIZONS.map((h) => (
-          <span key={h.key} className="ws-target">
-            {h.label} <b>{count(h.key)}</b>
-          </span>
+        {TIERS.map((t) => (
+          <span key={t.key} className="ws-target">{t.label} <b>{count(t.key)}</b></span>
         ))}
       </div>
 
@@ -51,9 +44,7 @@ export function WorkspaceView({ d }: { d: Deck }) {
           <div className="ws-pile-lines">
             {pile.length === 0 && <p className="muted">Pile's empty.</p>}
             {pile.map((line, i) => (
-              <button key={i} className="ws-pile-line" onClick={() => pull(line)} title="Pull into the canvas">
-                {line}
-              </button>
+              <button key={i} className="ws-pile-line" onClick={() => pull(line)} title="Pull into the canvas">{line}</button>
             ))}
           </div>
         </aside>
@@ -67,16 +58,15 @@ export function WorkspaceView({ d }: { d: Deck }) {
             onBlur={() => { dirty.current = false; if (text !== d.scratchContent) d.saveScratch(text); }}
             placeholder="Pull from the pile, sit with it, sort what you're actually doing…"
           />
-
           {commitLines.length > 0 && (
             <div className="ws-commit">
-              <div className="ws-col-label">Commit a line to a column:</div>
+              <div className="ws-col-label">Commit a line to a tier:</div>
               {commitLines.map((line, i) => (
                 <div key={i} className="ws-commit-row">
                   <span className="ws-commit-text">{line}</span>
                   <span className="ws-commit-targets">
-                    {HORIZONS.map((h) => (
-                      <button key={h.key} onClick={() => d.addCard(h.key, line)}>→ {h.label}</button>
+                    {TIERS.map((t) => (
+                      <button key={t.key} onClick={() => d.addCard(t.key, line)}>→ {t.label}</button>
                     ))}
                   </span>
                 </div>

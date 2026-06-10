@@ -7,9 +7,9 @@ export interface NowTask {
   cardId?: string;
 }
 
-// One thing, full screen. Pick-only: the candidates are your TODAY cards — Right
-// Now never creates a task, it just asks "which of Today am I doing now?" The
-// held signal is the trust signal; the notes field is room to work the one thing.
+// One thing, full screen. You arrive here by focusing a Move (◎). Pick-only —
+// candidates are your Moves. The held line is the trust signal; the notes field
+// is room to work the one thing. Capture still floats in the corner (global).
 export function RightNow({
   d,
   nowTask,
@@ -20,7 +20,7 @@ export function RightNow({
   setNowTask: (t: NowTask | null) => void;
 }) {
   const [picking, setPicking] = useState(!nowTask);
-  const today = d.cards.filter((c) => !c.done && c.horizon === "today").sort(byOrder);
+  const moves = d.cards.filter((c) => !c.done && c.tier === "move").sort(byOrder);
   const held = d.cards.filter((c) => !c.done && c.id !== nowTask?.cardId).length;
   const card = nowTask?.cardId ? d.cards.find((c) => c.id === nowTask.cardId) ?? null : null;
 
@@ -36,9 +36,7 @@ export function RightNow({
         <span className="now-eyebrow">RIGHT NOW</span>
         <h2 className="now-task">{nowTask.text}</h2>
         <div className="now-actions">
-          <button className="btn-soft" onClick={() => { setNowTask(null); setPicking(true); }}>
-            Pick another
-          </button>
+          <button className="btn-soft" onClick={() => { setNowTask(null); setPicking(true); }}>Pick another</button>
           <button className="btn-accent" onClick={finish}>Done</button>
         </div>
         <p className="held-line">
@@ -55,9 +53,9 @@ export function RightNow({
     <div className="now-pick">
       <span className="now-eyebrow">RIGHT NOW</span>
       <h2 className="now-pick-title">Pick the one thing.</h2>
-      <p className="now-caption">From Today — pick one to focus on.</p>
-      {today.length === 0 && <p className="muted">Nothing on Today yet. Flick something in from the pile.</p>}
-      {today.map((c) => (
+      <p className="now-caption">From your Moves — pick one to focus on.</p>
+      {moves.length === 0 && <p className="muted">No Moves yet. Add a needle-mover to the deck first.</p>}
+      {moves.map((c) => (
         <button
           key={c.id}
           className="now-option"
@@ -66,22 +64,19 @@ export function RightNow({
           {c.text}
         </button>
       ))}
-      {today.length > 0 && (
-        <p className="held-line">{today.length} on Today, held and waiting — nothing's lost.</p>
+      {moves.length > 0 && (
+        <p className="held-line">{held} held and waiting — nothing's lost.</p>
       )}
     </div>
   );
 }
 
-// Scratch space for the focused task, saved into the task's own note on blur.
 function NotesField({ card, onSave }: { card: DeckCard; onSave: (notes: string) => void }) {
   const [text, setText] = useState(card.notes);
   const dirty = useRef(false);
-
   useEffect(() => {
     if (!dirty.current) setText(card.notes);
   }, [card.notes]);
-
   return (
     <div className="now-notes">
       <div className="now-notes-label">Notes — sub-steps, where you're at</div>

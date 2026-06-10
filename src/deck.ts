@@ -1,4 +1,4 @@
-import type { Horizon, Note } from "./types";
+import type { Horizon, Note, Tier } from "./types";
 import { DECK_TAG } from "./types";
 
 // Collapse real OR literal-escaped newlines/tabs to spaces for single-line
@@ -15,11 +15,20 @@ export function inlineText(s: string): string {
 export interface DeckCard {
   id: string;
   text: string;
-  horizon: Horizon;
+  tier: Tier; // primary: move / must / errand
+  horizon: Horizon; // secondary time chip: today / week / later
   done: boolean;
   order: number;
   createdAt: number;
   notes: string; // scratch space for working the task, stored below the H1
+}
+
+// Tier lives in metadata (reliable to update). Missing → "must" (the calm
+// middle), so nothing created under the old model gets lost or floods Moves.
+function tierOf(note: Note): Tier {
+  const t = note.metadata?.tier;
+  if (t === "move" || t === "must" || t === "errand") return t;
+  return "must";
 }
 
 // A note belongs to the deck iff it carries a deck tag (flat `deck` or a
@@ -88,6 +97,7 @@ export function cardFromNote(note: Note): DeckCard {
   return {
     id: note.id,
     text: textOf(note),
+    tier: tierOf(note),
     horizon: horizonOf(note),
     done: boolMeta(note.metadata?.done),
     order: orderOf(note),

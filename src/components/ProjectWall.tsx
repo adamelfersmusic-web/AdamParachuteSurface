@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { projectLines, projectTitle } from "../deck";
-import { HORIZONS, type Horizon } from "../types";
+import { TIERS, type Tier } from "../types";
 import type { Note } from "../types";
 
-// Inside a project: the WALL (where it's at + next steps) — calm, editable, the
+// Inside a project: the WALL (current phase + next steps) — calm, editable, the
 // main thing. A capture box that sends straight to the DECK (project tasks are
-// already decided). And a quiet link to the full deep note, opened on purpose.
-// The deep note is never edited here.
+// decided). A quiet link to the untouched deep note. Deep note never edited here.
 export function ProjectWall({
   wall,
   deep,
   onSaveWall,
-  onFlickToday,
+  onFlickDeck,
   onFlickNow,
   onCapture,
   onOpenDeep,
@@ -20,9 +19,9 @@ export function ProjectWall({
   wall: Note;
   deep: Note | null;
   onSaveWall: (content: string) => void;
-  onFlickToday: (text: string) => void;
+  onFlickDeck: (text: string) => void;
   onFlickNow: (text: string) => void;
-  onCapture: (horizon: Horizon, text: string) => void;
+  onCapture: (tier: Tier, text: string) => void;
   onOpenDeep: () => void;
   onClose: () => void;
 }) {
@@ -52,11 +51,9 @@ export function ProjectWall({
         </div>
 
         <div className="sketch-label">
-          <span>The wall — where it's at / next steps</span>
+          <span>The wall — current phase / next steps</span>
           {!editing && (
-            <button className="sketch-edit" onClick={() => { setEditing(true); focused.current = true; }}>
-              ✎ edit
-            </button>
+            <button className="sketch-edit" onClick={() => { setEditing(true); focused.current = true; }}>✎ edit</button>
           )}
         </div>
 
@@ -65,7 +62,7 @@ export function ProjectWall({
             className="sketch-area"
             autoFocus
             value={content}
-            placeholder={`Where is ${projectTitle(wall)} at? What are the next moves?`}
+            placeholder={`What phase is ${projectTitle(wall)} in, and what are the next few moves?`}
             onFocus={() => { focused.current = true; }}
             onChange={(e) => setContent(e.target.value)}
             onBlur={commit}
@@ -73,7 +70,7 @@ export function ProjectWall({
         ) : (
           <div className="sketch-lines">
             {lines.filter((l) => !l.empty).length === 0 && (
-              <p className="muted" style={{ padding: "8px 14px" }}>Empty. Tap ✎ edit to fill the wall.</p>
+              <p className="muted" style={{ padding: "8px 14px" }}>Empty — tap ✎ edit. Write the current phase + your next few moves.</p>
             )}
             {lines.map((line, i) =>
               line.empty ? null : line.heading ? (
@@ -83,7 +80,7 @@ export function ProjectWall({
                   <span className="sketch-text">{line.text}</span>
                   <span className="line-actions">
                     <button className="pull-now" onClick={() => onFlickNow(line.text)}>◎ now</button>
-                    <button className="pull-deck" onClick={() => onFlickToday(line.text)}>→ today</button>
+                    <button className="pull-deck" onClick={() => onFlickDeck(line.text)}>→ deck</button>
                   </span>
                 </div>
               ),
@@ -93,19 +90,11 @@ export function ProjectWall({
 
         <div className="proj-capture">
           <div className="sketch-label"><span>New task → straight to the deck</span></div>
-          <input
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            placeholder="A next move for this project…"
-          />
+          <input value={task} onChange={(e) => setTask(e.target.value)} placeholder="A next move for this project…" />
           <div className="proj-capture-targets">
-            {HORIZONS.map((h) => (
-              <button
-                key={h.key}
-                disabled={!task.trim()}
-                onClick={() => { onCapture(h.key, task.trim()); setTask(""); }}
-              >
-                → {h.label}
+            {TIERS.map((t) => (
+              <button key={t.key} disabled={!task.trim()} onClick={() => { onCapture(t.key, task.trim()); setTask(""); }}>
+                → {t.label}
               </button>
             ))}
           </div>

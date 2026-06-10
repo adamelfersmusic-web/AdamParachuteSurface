@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { pileLines } from "../deck";
-import type { Horizon } from "../types";
+import { TIERS, type Tier } from "../types";
 
-// The pile. The flick (pile → day) is the heartbeat of the whole app, so it's
-// one frictionless tap: the line is the button — tap it, it's on Today, done.
-// "Wk"/"Later" are quiet secondary targets. Flicked lines get a soft ✓ so you
-// can sweep straight down the pile without losing your place. The line stays in
-// the pile — pulling is borrowing, not moving.
-//
-// (Structured so a future "suggested for today" filter can pre-sort/flag the
-// `items` array without touching this component's interaction.)
+// The pile. Flick a line onto the deck by tapping a tier — Moves / Must-dos /
+// Errands. The line gets a soft ✓ so you can sweep the pile without losing your
+// place; it stays in the pile (pulling is borrowing). "Edit raw" edits the note.
 export function RunningListDrawer({
   content,
   onWrite,
@@ -19,15 +14,14 @@ export function RunningListDrawer({
   content: string;
   onWrite: (text: string) => void;
   onClose: () => void;
-  onPull: (horizon: Horizon, text: string) => void;
+  onPull: (tier: Tier, text: string) => void;
 }) {
   const [text, setText] = useState(content);
   const [pulled, setPulled] = useState<Set<string>>(new Set());
-
   const items = pileLines(text);
 
-  function flick(horizon: Horizon, line: string) {
-    onPull(horizon, line);
+  function flick(tier: Tier, line: string) {
+    onPull(tier, line);
     setPulled((p) => new Set(p).add(line));
   }
 
@@ -39,7 +33,7 @@ export function RunningListDrawer({
           <h2>The pile</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
         </div>
-        <p className="drawer-sub">Tap a line to flick it into <strong>Today</strong>. Leave the rest here.</p>
+        <p className="drawer-sub">Tap a tier to flick a line onto the deck. Leave the rest here.</p>
 
         <div className="drawer-lines">
           {items.length === 0 && <p className="muted">Empty. Add things with ✅ Quick To-Do.</p>}
@@ -47,14 +41,13 @@ export function RunningListDrawer({
             const done = pulled.has(line);
             return (
               <div key={i} className={`flick-row${done ? " pulled" : ""}`}>
-                <button className="flick-main" onClick={() => flick("today", line)} title="Flick into Today">
-                  <span className="flick-check">{done ? "✓" : "→"}</span>
-                  <span className="flick-text">{line}</span>
-                  {done && <span className="flick-tag">on Today</span>}
-                </button>
-                <span className="flick-alts">
-                  <button onClick={() => flick("week", line)} title="This Week">Wk</button>
-                  <button onClick={() => flick("later", line)} title="Later">Later</button>
+                <span className="flick-text">{done ? "✓ " : ""}{line}</span>
+                <span className="flick-tiers">
+                  {TIERS.map((t) => (
+                    <button key={t.key} className="flick-tier" onClick={() => flick(t.key, line)} title={`Flick into ${t.label}`}>
+                      {t.label}
+                    </button>
+                  ))}
                 </span>
               </div>
             );
@@ -63,12 +56,7 @@ export function RunningListDrawer({
 
         <details className="drawer-raw">
           <summary>Edit raw</summary>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={() => onWrite(text)}
-            rows={10}
-          />
+          <textarea value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onWrite(text)} rows={10} />
         </details>
       </aside>
     </>

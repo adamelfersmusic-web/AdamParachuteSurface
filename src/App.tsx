@@ -15,7 +15,7 @@ import { RightNow, type NowTask } from "./components/RightNow";
 import { ProjectsView } from "./components/ProjectsView";
 import { ProjectWall } from "./components/ProjectWall";
 import { ProjectNote } from "./components/ProjectNote";
-import { HorizonFocus } from "./components/HorizonFocus";
+import { CalendarView } from "./components/CalendarView";
 import { CaptureFab, type CaptureMode } from "./components/CaptureFab";
 import { RunningListDrawer } from "./components/RunningListDrawer";
 import { TimeStrip } from "./components/TimeStrip";
@@ -24,7 +24,7 @@ import { WorkspaceView } from "./components/WorkspaceView";
 import { ScratchpadView } from "./components/ScratchpadView";
 import { useDeck } from "./useDeck";
 import type { DeckCard } from "./deck";
-import type { AuthSession, Horizon, Note } from "./types";
+import type { AuthSession, Note } from "./types";
 
 type OAuthPhase =
   | { kind: "none" }
@@ -52,7 +52,6 @@ export function App() {
   useEffect(() => {
     if (ranReturn.current) return;
     ranReturn.current = true;
-
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const state = params.get("state");
@@ -64,10 +63,8 @@ export function App() {
       if (saved) adopt(saved);
       return;
     }
-
     const cleanUrl = window.location.origin + window.location.pathname;
     window.history.replaceState(null, "", cleanUrl);
-
     if (oauthError) {
       setPhase({ kind: "error", message: `Hub returned: ${oauthError}` });
       return;
@@ -77,13 +74,11 @@ export function App() {
       if (saved) adopt(saved);
       return;
     }
-
     setPhase({ kind: "completing" });
     completeOAuth(code!, state!)
       .then(({ pending, token }) => {
-        const vaultUrl = resolveVaultUrl(token, pending.issuerUrl);
         adopt({
-          vaultUrl,
+          vaultUrl: resolveVaultUrl(token, pending.issuerUrl),
           issuer: pending.issuer,
           tokenEndpoint: pending.tokenEndpoint,
           clientId: pending.clientId,
@@ -92,68 +87,42 @@ export function App() {
         setPhase({ kind: "none" });
       })
       .catch((err) => {
-        if (err instanceof PendingApprovalError) {
-          setPhase({ kind: "approval", approveUrl: err.approveUrl });
-        } else {
-          setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
-        }
+        if (err instanceof PendingApprovalError) setPhase({ kind: "approval", approveUrl: err.approveUrl });
+        else setPhase({ kind: "error", message: err instanceof Error ? err.message : String(err) });
       });
   }, []);
 
   if (phase.kind === "completing") {
     return (
       <div className="config-screen">
-        <div className="config-card center">
-          <h1>Connecting…</h1>
-          <p className="muted">Exchanging the authorization code with your vault.</p>
-        </div>
+        <div className="config-card center"><h1>Connecting…</h1><p className="muted">Exchanging the authorization code with your vault.</p></div>
       </div>
     );
   }
-
   if (phase.kind === "approval") {
     return (
       <div className="config-screen">
         <div className="config-card center">
           <h1>Waiting for hub approval</h1>
-          <p className="muted">
-            Your hub admin needs to approve Adam Deck before sign-in can complete.
-            Open the approval page, approve, then connect again.
-          </p>
-          <a className="approve-link" href={phase.approveUrl} target="_blank" rel="noreferrer">
-            Open approval page
-          </a>
+          <p className="muted">Your hub admin needs to approve Adam Deck before sign-in can complete. Approve, then connect again.</p>
+          <a className="approve-link" href={phase.approveUrl} target="_blank" rel="noreferrer">Open approval page</a>
           <button className="btn-soft" onClick={() => setPhase({ kind: "none" })}>Back</button>
         </div>
       </div>
     );
   }
-
   if (!auth) {
-    return (
-      <ConfigScreen
-        onConnected={adopt}
-        notice={phase.kind === "error" ? phase.message : undefined}
-      />
-    );
+    return <ConfigScreen onConnected={adopt} notice={phase.kind === "error" ? phase.message : undefined} />;
   }
-
-  return (
-    <DeckApp
-      auth={auth}
-      onDisconnect={() => {
-        clearSession();
-        setAuth(null);
-      }}
-    />
-  );
+  return <DeckApp auth={auth} onDisconnect={() => { clearSession(); setAuth(null); }} />;
 }
 
-type ViewId = "deck" | "now" | "projects" | "workspace" | "scratch";
+type ViewId = "deck" | "now" | "projects" | "calendar" | "workspace" | "scratch";
 const NAV: { id: ViewId; label: string }[] = [
   { id: "deck", label: "Deck" },
   { id: "now", label: "Right Now" },
   { id: "projects", label: "Projects" },
+  { id: "calendar", label: "Calendar" },
   { id: "workspace", label: "Workspace" },
   { id: "scratch", label: "Scratch" },
 ];
@@ -166,7 +135,6 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
   const [nowTask, setNowTask] = useState<NowTask | null>(null);
-  const [focusHorizon, setFocusHorizon] = useState<Horizon | null>(null);
   const [openProject, setOpenProject] = useState<Note | null>(null);
   const [deepOpen, setDeepOpen] = useState(false);
 
@@ -174,9 +142,8 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
     if (!openProject) setDeepOpen(false);
   }, [openProject]);
 
-  function setNow(card: DeckCard) {
+  function focus(card: DeckCard) {
     setNowTask({ text: card.text, cardId: card.id });
-    setFocusHorizon(null);
     setView("now");
   }
   function flickNow(text: string) {
@@ -197,11 +164,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
         <div className="topbar-right">
           <nav className="nav">
             {NAV.map((n) => (
-              <button
-                key={n.id}
-                className={`nav-btn${view === n.id ? " active" : ""}`}
-                onClick={() => setView(n.id)}
-              >
+              <button key={n.id} className={`nav-btn${view === n.id ? " active" : ""}`} onClick={() => setView(n.id)}>
                 {n.label}
               </button>
             ))}
@@ -213,10 +176,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
       </header>
 
       {d.error && (
-        <div className="app-error">
-          {d.error}
-          <button className="link-btn" onClick={d.clearError}>dismiss</button>
-        </div>
+        <div className="app-error">{d.error}<button className="link-btn" onClick={d.clearError}>dismiss</button></div>
       )}
 
       <main className="main">
@@ -227,12 +187,13 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
             <div className="deck-toolbar">
               <button className="pile-open" onClick={() => setDrawerOpen(true)}>↧ Flick from the pile</button>
             </div>
-            <DeckView d={d} setNow={setNow} openHorizon={setFocusHorizon} />
+            <DeckView d={d} onFocus={focus} />
             <p className="held-foot">Everything you've captured is held in your vault — the deck is only what you chose.</p>
           </>
         )}
         {view === "now" && <RightNow d={d} nowTask={nowTask} setNowTask={setNowTask} />}
         {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} onAdd={d.addProject} />}
+        {view === "calendar" && <CalendarView days={d.calendarDays} events={d.events} onSetDay={d.setCalendarDay} />}
         {view === "workspace" && <WorkspaceView d={d} />}
         {view === "scratch" && <ScratchpadView content={d.scratchContent} onSave={d.saveScratch} />}
       </main>
@@ -244,12 +205,8 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
           content={d.runningContent}
           onWrite={d.writeRunning}
           onClose={() => setDrawerOpen(false)}
-          onPull={(h, text) => d.addCard(h, text)}
+          onPull={(tier, text) => d.addCard(tier, text)}
         />
-      )}
-
-      {focusHorizon && (
-        <HorizonFocus d={d} horizon={focusHorizon} setNow={setNow} onClose={() => setFocusHorizon(null)} />
       )}
 
       {openProject && (
@@ -257,9 +214,9 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
           wall={openProject}
           deep={deep}
           onSaveWall={(content) => d.saveWall(openProject.id, content)}
-          onFlickToday={(text) => d.addCard("today", text)}
+          onFlickDeck={(text) => d.addCard("move", text, "today")}
           onFlickNow={flickNow}
-          onCapture={(h, text) => d.addCard(h, text)}
+          onCapture={(tier, text) => d.addCard(tier, text)}
           onOpenDeep={() => setDeepOpen(true)}
           onClose={() => setOpenProject(null)}
         />
@@ -270,7 +227,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
           note={deep}
           onClose={() => setDeepOpen(false)}
           onPullNow={flickNow}
-          onPullDeck={(text) => d.addCard("today", text)}
+          onPullDeck={(text) => d.addCard("move", text, "today")}
         />
       )}
     </div>

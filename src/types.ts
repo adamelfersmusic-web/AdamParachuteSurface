@@ -98,6 +98,20 @@ export const HORIZON_LABEL: Record<Horizon, string> = {
 export const DECK_TAG = "deck";
 export const deckTag = (h: Horizon): string => `${DECK_TAG}/${h}`;
 
+// The deck is now organized by TYPE + ENERGY (primary), with time as a secondary
+// chip on each card. Three tiers, decreasing visual weight.
+export type Tier = "move" | "must" | "errand";
+export const TIERS: { key: Tier; label: string; energy: string; meta: string }[] = [
+  { key: "move", label: "Moves", energy: "High energy", meta: "the needle-movers · keep it to 2–3 · do when you're sharp" },
+  { key: "must", label: "Must-dos", energy: "Medium", meta: "has to happen · keeps life stable · real cost if skipped" },
+  { key: "errand", label: "Errands", energy: "Low energy", meta: "the small tail · life admin · low-energy gaps" },
+];
+export const TIER_LABEL: Record<Tier, string> = { move: "Moves", must: "Must-dos", errand: "Errands" };
+
+// Calendar / macro time view — one note holding "YYYY-MM-DD :: text" day notes.
+export const CALENDAR_TAG = "calendar";
+export const CALENDAR_PATH = "calendar";
+
 // The ONE running-list note: ✅ Quick To-Do appends to it, the drawer fishes
 // from it. Its own tag so it never shows up as a deck card.
 export const RUNNING_TAG = "running-list";
