@@ -6,7 +6,7 @@ export interface Note {
   path: string;
   title: string; // derived from the path basename
   content?: string; // only present after a single-note fetch
-  preview?: string; // ~120 char snippet from list endpoint
+  preview?: string;
   tags: string[];
   metadata: Record<string, unknown>;
   links?: NoteLink[];
@@ -25,33 +25,26 @@ export interface TagInfo {
   count: number;
 }
 
-// OAuth scope vocabulary, per parachute's oauth-scopes pattern. The vault also
-// honors the legacy "full" synonym, but we request the current vocabulary.
+// OAuth scope vocabulary, per parachute's oauth-scopes pattern.
 export type TokenScope = string;
 export const DEFAULT_SCOPE: TokenScope = "vault:read vault:write";
 
-// Persisted token envelope (mirrors surface-client's StoredToken).
 export interface StoredToken {
   accessToken: string;
-  /** Absolute UTC ms (`Date.now()` baseline): now + expires_in * 1000. */
   expiresAt?: number;
   refreshToken?: string;
   scope: TokenScope;
   vault?: string;
 }
 
-// What we persist for a connected vault. `issuer`/`tokenEndpoint`/`clientId`
-// are present for OAuth sessions (needed to silently refresh); a pasted-token
-// session has just the vault URL + access token.
 export interface AuthSession {
-  vaultUrl: string; // base for /api calls, e.g. https://hub/vault/adam
+  vaultUrl: string;
   issuer?: string;
   tokenEndpoint?: string;
   clientId?: string;
   token: StoredToken;
 }
 
-// RFC 8414 Authorization Server metadata (the subset we use).
 export interface AuthServerMetadata {
   issuer: string;
   authorization_endpoint: string;
@@ -60,7 +53,6 @@ export interface AuthServerMetadata {
   code_challenge_methods_supported?: string[];
 }
 
-// Token-endpoint response (RFC 6749 §4.1.4 + hub `services`/`vault` extensions).
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";
@@ -71,7 +63,6 @@ export interface TokenResponse {
   services?: Record<string, { url?: string } | undefined>;
 }
 
-// PKCE + flow state stashed in sessionStorage between redirect and callback.
 export interface PendingOAuth {
   issuerUrl: string;
   issuer: string;
@@ -85,41 +76,35 @@ export interface PendingOAuth {
 }
 
 // --- Adam Deck domain --------------------------------------------------------
+//
+// The deck is a clean room. Deck cards are the deck's OWN notes, tagged under a
+// dedicated `deck/<horizon>` namespace, so the deck only ever reads `tag: deck`
+// — it can never inhale the master/running lists (tagged differently).
 
-// "Active Projects (next 2 weeks)" is a single free-text note the user types
-// into directly. It lives at a fixed path and is created on first use if it
-// doesn't exist yet.
-export const DASHBOARD_TAG = "dashboard";
-export const ACTIVE_PROJECTS_PATH = "dashboard/active-projects";
-export const ACTIVE_PROJECTS_SEED =
-  "# Active Projects — Next 2 Weeks\n\n" +
-  "_Type anything here. This is yours — it saves to your vault when you click away._\n\n" +
-  "- \n";
+export type Horizon = "today" | "week" | "later";
 
-// Each todo is its own note tagged `todo`, with `when` + `done` metadata, living
-// under todos/. The board only ever shows todos that look like board todos (see
-// isBoardTodo in todos.ts) — the vault's big "MASTER TO-DO LIST" notes are also
-// tagged `todo` and must stay off the board.
-export const TODO_TAG = "todo";
-export const TODOS_PATH_PREFIX = "todos/";
+export const HORIZONS: { key: Horizon; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "week", label: "This Week" },
+  { key: "later", label: "Later" },
+];
 
-// The three columns, in board order. `when` metadata on a todo note is one of
-// these literals.
-export const TODO_COLUMNS = ["today", "this-week", "later"] as const;
-export type TodoWhen = (typeof TODO_COLUMNS)[number];
-
-export const COLUMN_LABEL: Record<TodoWhen, string> = {
+export const HORIZON_LABEL: Record<Horizon, string> = {
   today: "Today",
-  "this-week": "This Week",
+  week: "This Week",
   later: "Later",
 };
 
-// Off-board sentinel: a todo note whose `when` is this (or anything not in
-// TODO_COLUMNS) is kept in the vault but doesn't show on the board.
-export const WHEN_OFF_BOARD = "";
+export const DECK_TAG = "deck";
+export const deckTag = (h: Horizon): string => `${DECK_TAG}/${h}`;
 
-// What's currently being dragged: an existing board card, or a chip pulled from
-// the master-list drawer (which becomes a new card when dropped).
-export type DragItem =
-  | { kind: "card"; id: string }
-  | { kind: "chip"; text: string };
+// The ONE running-list note: ✅ Quick To-Do appends to it, the drawer fishes
+// from it. Its own tag so it never shows up as a deck card.
+export const RUNNING_TAG = "running-list";
+export const RUNNING_PATH = "running-list";
+
+// 🧠 Brain Dump → a new note tagged `capture`, fired into the vault.
+export const CAPTURE_TAG = "capture";
+
+// Projects view reads the existing reference notes tagged `status`.
+export const STATUS_TAG = "status";

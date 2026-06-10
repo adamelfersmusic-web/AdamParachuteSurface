@@ -10,13 +10,16 @@ import {
   storedFromTokenResponse,
 } from "./oauth";
 import { ConfigScreen } from "./components/ConfigScreen";
-import { CalmColumnsView } from "./components/views/CalmColumnsView";
-import { FocusView } from "./components/views/FocusView";
-import { CardsView } from "./components/views/CardsView";
-import { InboxDrawer } from "./components/InboxDrawer";
-import { useDashboard } from "./useDashboard";
-import type { BoardProps } from "./board";
-import type { AuthSession, DragItem, TodoWhen } from "./types";
+import { DeckView } from "./components/DeckView";
+import { RightNow, type NowTask } from "./components/RightNow";
+import { ProjectsView } from "./components/ProjectsView";
+import { ProjectNote } from "./components/ProjectNote";
+import { HorizonFocus } from "./components/HorizonFocus";
+import { CaptureFab, type CaptureMode } from "./components/CaptureFab";
+import { RunningListDrawer } from "./components/RunningListDrawer";
+import { useDeck } from "./useDeck";
+import type { DeckCard } from "./deck";
+import type { AuthSession, Horizon, Note } from "./types";
 
 type OAuthPhase =
   | { kind: "none" }
@@ -29,7 +32,6 @@ export function App() {
   const [phase, setPhase] = useState<OAuthPhase>({ kind: "none" });
   const ranReturn = useRef(false);
 
-  // Build (or rebuild) the auth manager from a session and remember it.
   function adopt(session: AuthSession) {
     saveSession(session);
     setAuth(
@@ -42,7 +44,6 @@ export function App() {
     );
   }
 
-  // On first load, either restore a saved session or finish an OAuth return.
   useEffect(() => {
     if (ranReturn.current) return;
     ranReturn.current = true;
@@ -59,7 +60,6 @@ export function App() {
       return;
     }
 
-    // Clean the OAuth params out of the URL so a refresh doesn't re-run it.
     const cleanUrl = window.location.origin + window.location.pathname;
     window.history.replaceState(null, "", cleanUrl);
 
@@ -118,9 +118,7 @@ export function App() {
           <a className="approve-link" href={phase.approveUrl} target="_blank" rel="noreferrer">
             Open approval page
           </a>
-          <button className="ghost" onClick={() => setPhase({ kind: "none" })}>
-            Back
-          </button>
+          <button className="btn-soft" onClick={() => setPhase({ kind: "none" })}>Back</button>
         </div>
       </div>
     );
@@ -136,7 +134,7 @@ export function App() {
   }
 
   return (
-    <Dashboard
+    <DeckApp
       auth={auth}
       onDisconnect={() => {
         clearSession();
@@ -146,104 +144,96 @@ export function App() {
   );
 }
 
-const DESIGNS = [
-  { id: "calm", label: "Calm" },
-  { id: "focus", label: "Focus" },
-  { id: "cards", label: "Cards" },
-] as const;
-type DesignId = (typeof DESIGNS)[number]["id"];
+type ViewId = "deck" | "now" | "projects";
 
-function Dashboard({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () => void }) {
+function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () => void }) {
   const api = useMemo(() => new VaultApi(auth), [auth]);
-  const d = useDashboard(api);
+  const d = useDeck(api);
 
-  const [design, setDesign] = useState<DesignId>(
-    () => (localStorage.getItem("adam-deck.design") as DesignId) || "calm",
-  );
-  function chooseDesign(id: DesignId) {
-    setDesign(id);
-    localStorage.setItem("adam-deck.design", id);
-  }
-
-  // Shared drag state so a chip from the drawer can land in a column.
-  const [drag, setDrag] = useState<DragItem | null>(null);
+  const [view, setView] = useState<ViewId>("deck");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
+  const [nowTask, setNowTask] = useState<NowTask | null>(null);
+  const [focusHorizon, setFocusHorizon] = useState<Horizon | null>(null);
+  const [openProject, setOpenProject] = useState<Note | null>(null);
 
-  function dropInColumn(when: TodoWhen, index: number) {
-    if (drag?.kind === "card") d.moveTodo(drag.id, when, index);
-    else if (drag?.kind === "chip") d.addTodo(when, drag.text);
-    setDrag(null);
+  function setNow(card: DeckCard) {
+    setNowTask({ text: card.text, cardId: card.id });
+    setFocusHorizon(null);
+    setView("now");
   }
-
-  const board: BoardProps = {
-    d,
-    drag,
-    setDrag,
-    dropInColumn,
-    moveCard: d.moveTodo,
-  };
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-name">Adam Deck</span>
+          <h1>Adam Deck</h1>
           <span className="brand-slug">{vaultSlug(auth.vaultBase)}</span>
         </div>
-
-        <nav className="design-switch" aria-label="Choose a design">
-          {DESIGNS.map((dz) => (
-            <button
-              key={dz.id}
-              className={`design-tab${design === dz.id ? " active" : ""}`}
-              onClick={() => chooseDesign(dz.id)}
-            >
-              {dz.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="topbar-actions">
-          <button
-            className={`ghost pull-btn${drawerOpen ? " active" : ""}`}
-            onClick={() => setDrawerOpen((o) => !o)}
-            title="Pull from your lists"
-          >
-            ↧ List
-          </button>
-          <button className="ghost" onClick={d.reload} title="Refresh">↻</button>
-          <button className="ghost" onClick={onDisconnect} title="Disconnect">⏻</button>
+        <div className="topbar-right">
+          <nav className="nav">
+            {(["deck", "now", "projects"] as const).map((v) => (
+              <button
+                key={v}
+                className={`nav-btn${view === v ? " active" : ""}`}
+                onClick={() => setView(v)}
+              >
+                {v === "deck" ? "Deck" : v === "now" ? "Right Now" : "Projects"}
+              </button>
+            ))}
+          </nav>
+          <button className="icon-btn" title="Running list" onClick={() => setDrawerOpen(true)}>≡</button>
+          <button className="icon-btn" title="Refresh" onClick={d.reload}>↻</button>
+          <button className="icon-btn" title="Disconnect" onClick={onDisconnect}>⏻</button>
         </div>
       </header>
 
       {d.error && (
-        <div className="error-box app-error">
+        <div className="app-error">
           {d.error}
-          <button className="ghost tiny" onClick={d.clearError}>dismiss</button>
+          <button className="link-btn" onClick={d.clearError}>dismiss</button>
         </div>
       )}
 
-      <div className={`deck-wrap${drawerOpen ? " with-drawer" : ""}`}>
-        <div className="deck-main">
-          {d.loading && d.todos.length === 0 && !d.projectsContent ? (
-            <div className="muted center pad">Loading your dashboard…</div>
-          ) : design === "focus" ? (
-            <FocusView {...board} />
-          ) : design === "cards" ? (
-            <CardsView {...board} />
-          ) : (
-            <CalmColumnsView {...board} />
-          )}
-        </div>
+      <main className="main">
+        {view === "deck" && <DeckView d={d} setNow={setNow} openHorizon={setFocusHorizon} />}
+        {view === "now" && <RightNow d={d} nowTask={nowTask} setNowTask={setNowTask} />}
+        {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} />}
+      </main>
 
-        <InboxDrawer
-          open={drawerOpen}
+      <CaptureFab
+        mode={captureMode}
+        setMode={setCaptureMode}
+        onDump={d.createCapture}
+        onTodo={d.appendRunning}
+      />
+
+      {drawerOpen && (
+        <RunningListDrawer
+          content={d.runningContent}
+          onWrite={d.writeRunning}
           onClose={() => setDrawerOpen(false)}
-          groups={d.inbox}
-          onPull={d.addTodo}
-          setDrag={setDrag}
+          onPull={(h, text) => d.addCard(h, text)}
         />
-      </div>
+      )}
+
+      {focusHorizon && (
+        <HorizonFocus
+          d={d}
+          horizon={focusHorizon}
+          setNow={setNow}
+          onClose={() => setFocusHorizon(null)}
+        />
+      )}
+
+      {openProject && (
+        <ProjectNote
+          note={openProject}
+          onClose={() => setOpenProject(null)}
+          onPullNow={(text) => { setNowTask({ text }); setOpenProject(null); setView("now"); }}
+          onPullDeck={(text) => d.addCard("today", text)}
+        />
+      )}
     </div>
   );
 }
