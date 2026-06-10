@@ -149,8 +149,10 @@ export function useDeck(api: VaultApi): Deck {
           : e instanceof Error
             ? e.message
             : String(e);
-      setError(msg);
+      // Reload FIRST (it clears the error), then surface the failure — otherwise
+      // reload's setError(null) silently swallows what just went wrong.
       await reload();
+      setError(msg);
     }
   }
 
@@ -213,10 +215,12 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   // Clear the `now` flag from whatever currently holds it (at most a couple).
+  // No ifUpdatedAt: this is a one-field flag toggle — last write wins, always
+  // land it. A stale ifUpdatedAt here silently 409s and the flag never persists.
   async function clearAllNow(exceptId?: string) {
     for (const c of cards) {
       if (c.now && c.id !== exceptId) {
-        await api.updateNote(c.id, { metadata: { now: false }, ifUpdatedAt: updatedAt(c.id) });
+        await api.updateNote(c.id, { metadata: { now: false } });
       }
     }
   }
@@ -224,7 +228,7 @@ export function useDeck(api: VaultApi): Deck {
   async function promoteNow(card: DeckCard) {
     await guard(async () => {
       await clearAllNow(card.id);
-      await api.updateNote(card.id, { metadata: { now: true }, ifUpdatedAt: updatedAt(card.id) });
+      await api.updateNote(card.id, { metadata: { now: true } });
     });
   }
 
@@ -243,15 +247,11 @@ export function useDeck(api: VaultApi): Deck {
   }
 
   async function markNowDone(card: DeckCard) {
-    await guard(() =>
-      api.updateNote(card.id, { metadata: { done: true, now: false }, ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { metadata: { done: true, now: false } }));
   }
 
   async function clearNow(card: DeckCard) {
-    await guard(() =>
-      api.updateNote(card.id, { metadata: { now: false }, ifUpdatedAt: updatedAt(card.id) }),
-    );
+    await guard(() => api.updateNote(card.id, { metadata: { now: false } }));
   }
 
   async function createCapture(text: string) {
