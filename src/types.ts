@@ -107,10 +107,14 @@ export const RUNNING_PATH = "running-list";
 export const CAPTURE_TAG = "capture";
 
 // Projects view reads the existing reference notes tagged `status` (the "deep
-// note"). Each project also gets a small `sketchpad` note — current/next moves —
-// that opens by default; the deep note is opened on purpose.
+// note"). Each project is a thin `project` note (the wall: where it's at / next
+// steps) that LINKS to a deep note via metadata.deep — the deep note is never
+// edited. The global Scratchpad is one freeform note.
 export const STATUS_TAG = "status";
 export const SKETCH_TAG = "sketchpad";
+export const PROJECT_TAG = "project";
+export const SCRATCH_TAG = "scratchpad";
+export const SCRATCH_PATH = "scratchpad";
 
 // READ-ONLY surfaces (never pulled onto the deck automatically):
 // the time strip scans dated items out of these notes...

@@ -184,6 +184,73 @@ button { font-family: var(--body); cursor: pointer; }
 .deep-link { display: inline-block; margin-top: 18px; background: none; border: none; color: var(--faint); font-size: 13px; text-decoration: underline; }
 .deep-link:hover { color: var(--accent); }
 
+/* --- projects: add + wall + project capture -------------------------------- */
+.add-project { margin-top: 16px; }
+.add-project input {
+  width: 100%; border: 1px dashed var(--hair); border-radius: 10px; padding: 13px 16px;
+  font-size: 14px; font-family: var(--body); background: none; color: var(--ink); outline: none;
+}
+.add-project input:focus { border-color: var(--accent); border-style: solid; }
+.wall-heading { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--accent); padding: 12px 14px 4px; }
+.proj-capture { margin-top: 22px; border-top: 1px solid var(--hair); padding-top: 16px; }
+.proj-capture > input {
+  width: 100%; border: 1px solid var(--hair); border-radius: 10px; padding: 12px 14px;
+  font-size: 15px; font-family: var(--body); color: var(--ink); outline: none;
+}
+.proj-capture > input:focus { border-color: var(--accent); }
+.proj-capture-targets { display: flex; gap: 8px; margin-top: 10px; }
+.proj-capture-targets button {
+  flex: 1; border: 1px solid var(--hair); background: var(--card); color: var(--ink-soft, var(--faint));
+  border-radius: 9px; padding: 9px; font-size: 13px;
+}
+.proj-capture-targets button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.proj-capture-targets button:disabled { opacity: 0.4; }
+
+/* --- scratchpad room ------------------------------------------------------- */
+.scratch-room { max-width: 820px; margin: 0 auto; }
+.scratch-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.scratch-head h2 { font-size: 24px; }
+.scratch-hint { font-size: 13px; color: var(--faint); }
+.scratch-page {
+  width: 100%; min-height: 62vh; resize: vertical; border: 1px solid var(--hair);
+  border-radius: 16px; padding: 26px; background: var(--card); box-shadow: var(--shadow);
+  outline: none; font-family: var(--display); font-size: 18px; line-height: 1.7; color: var(--ink);
+}
+.scratch-page:focus { border-color: var(--accent); }
+
+/* --- workspace room (the one allowed to be denser) ------------------------- */
+.ws-targets { display: flex; gap: 18px; margin-bottom: 16px; color: var(--faint); font-size: 13px; }
+.ws-target b { color: var(--ink); font-family: var(--display); }
+.ws-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; align-items: start; }
+.ws-col-label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); margin-bottom: 10px; }
+.ws-pile { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.ws-pile-lines { display: flex; flex-direction: column; gap: 6px; }
+.ws-pile-line {
+  text-align: left; background: var(--card); border: 1px solid var(--hair); border-radius: 9px;
+  padding: 10px 12px; font-size: 13.5px; color: var(--ink); line-height: 1.35;
+}
+.ws-pile-line:hover { border-color: var(--accent); color: var(--accent); }
+.ws-area {
+  width: 100%; min-height: 320px; resize: vertical; border: 1px solid var(--hair);
+  border-radius: 14px; padding: 18px; background: var(--card); outline: none;
+  font-family: var(--display); font-size: 17px; line-height: 1.65; color: var(--ink);
+}
+.ws-area:focus { border-color: var(--accent); }
+.ws-commit { margin-top: 18px; }
+.ws-commit-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+.ws-commit-text { flex: 1; font-size: 14px; }
+.ws-commit-targets { display: flex; gap: 5px; }
+.ws-commit-targets button {
+  border: 1px solid var(--hair); background: none; color: var(--faint); border-radius: 7px;
+  padding: 3px 9px; font-size: 11.5px; white-space: nowrap;
+}
+.ws-commit-targets button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+@media (max-width: 760px) {
+  .ws-grid { grid-template-columns: 1fr; }
+  .ws-pile { position: static; max-height: none; }
+}
+
 /* --- capture fab ----------------------------------------------------------- */
 .fab-scrim { position: fixed; inset: 0; background: rgba(43, 39, 36, 0.28); z-index: 40; }
 .fab-wrap { position: fixed; right: 24px; bottom: 24px; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }

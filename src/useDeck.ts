@@ -15,9 +15,11 @@ import {
   CAPTURE_TAG,
   DECK_TAG,
   HORIZONS,
+  PROJECT_TAG,
   RUNNING_PATH,
   RUNNING_TAG,
-  SKETCH_TAG,
+  SCRATCH_PATH,
+  SCRATCH_TAG,
   STATUS_TAG,
   TODO_SCAN_TAG,
   LOOSE_END_TAGS,
@@ -29,8 +31,9 @@ export interface Deck {
   error: string | null;
   clearError: () => void;
   cards: DeckCard[];
-  projects: Note[];
+  projects: Note[]; // the thin "wall" notes
   runningContent: string;
+  scratchContent: string;
   events: DatedItem[];
   looseEnd: Note | null;
   reload: () => Promise<void>;
@@ -48,9 +51,14 @@ export interface Deck {
   handleLooseEnd: (note: Note) => Promise<void>;
   dismissLooseEnd: (note: Note) => Promise<void>;
 
-  // projects: sketchpad (opens by default) + deep note (status note)
-  loadSketch: (project: Note) => Promise<Note>;
-  saveSketch: (id: string, content: string) => Promise<Note>;
+  // projects: wall (this `project` note) + deep (the linked status note, untouched)
+  addProject: (name: string) => Promise<void>;
+  saveWall: (id: string, content: string) => Promise<Note>;
+  findDeep: (wall: Note) => Note | null;
+
+  // global scratchpad (one note, two framings: Scratchpad room + Workspace)
+  saveScratch: (content: string) => Promise<void>;
+  appendScratch: (text: string) => Promise<void>;
 }
 
 export function useDeck(api: VaultApi): Deck {
@@ -58,9 +66,13 @@ export function useDeck(api: VaultApi): Deck {
   const [error, setError] = useState<string | null>(null);
   const [cards, setCards] = useState<DeckCard[]>([]);
   const [projects, setProjects] = useState<Note[]>([]);
+  const [deepNotes, setDeepNotes] = useState<Note[]>([]);
   const [runningContent, setRunningContent] = useState("");
   const [runningId, setRunningId] = useState<string | null>(null);
   const [runningUpdatedAt, setRunningUpdatedAt] = useState<string | undefined>();
+  const [scratchContent, setScratchContent] = useState("");
+  const [scratchId, setScratchId] = useState<string | null>(null);
+  const [scratchUpdatedAt, setScratchUpdatedAt] = useState<string | undefined>();
   const [events, setEvents] = useState<DatedItem[]>([]);
   const [looseEnds, setLooseEnds] = useState<Note[]>([]);
   const cardNotes = useState<Map<string, Note>>(() => new Map())[0];
@@ -69,22 +81,35 @@ export function useDeck(api: VaultApi): Deck {
     setLoading(true);
     setError(null);
     try {
-      const [statusNotes, running, scanNotes, looseNotes, deckNotes] = await Promise.all([
-        api.queryNotes({ tag: STATUS_TAG, includeContent: true, limit: 50 }),
-        loadOrCreateRunning(api),
-        api.queryNotes({ tag: TODO_SCAN_TAG, includeContent: true, limit: 200 }),
-        loadLooseEnds(api),
-        loadDeckCards(api),
-      ]);
+      const [projectNotes, statusNotes, running, scratch, scanNotes, looseNotes, deckNotes] =
+        await Promise.all([
+          api.queryNotes({ tag: PROJECT_TAG, includeContent: true, limit: 100 }),
+          api.queryNotes({ tag: STATUS_TAG, includeContent: true, limit: 50 }),
+          loadOrCreate(api, RUNNING_TAG, RUNNING_PATH),
+          loadOrCreate(api, SCRATCH_TAG, SCRATCH_PATH),
+          api.queryNotes({ tag: TODO_SCAN_TAG, includeContent: true, limit: 200 }),
+          loadLooseEnds(api),
+          loadDeckCards(api),
+        ]);
 
       cardNotes.clear();
       deckNotes.forEach((n) => cardNotes.set(n.id, n));
       setCards(deckNotes.map(cardFromNote));
-      setProjects(statusNotes.filter((n) => n.tags.includes(STATUS_TAG)));
+
+      const status = statusNotes.filter((n) => n.tags.includes(STATUS_TAG));
+      setDeepNotes(status);
+      // Auto-create a thin wall for each deep note that lacks one. The deep note
+      // itself is NEVER touched — we only link to it.
+      const walls = await ensureWalls(api, projectNotes.filter((n) => n.tags.includes(PROJECT_TAG)), status);
+      setProjects(walls);
+
       setRunningContent(running.content ?? "");
       setRunningId(running.id);
       setRunningUpdatedAt(running.updatedAt);
-      setEvents(parseUpcoming([...scanNotes, ...statusNotes]));
+      setScratchContent(scratch.content ?? "");
+      setScratchId(scratch.id);
+      setScratchUpdatedAt(scratch.updatedAt);
+      setEvents(parseUpcoming([...scanNotes, ...status]));
       setLooseEnds(looseNotes.sort((a, b) => ts(a.updatedAt) - ts(b.updatedAt)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -136,7 +161,6 @@ export function useDeck(api: VaultApi): Deck {
     );
   }
 
-  // Move = a metadata update (reliable on this vault), never a re-tag.
   async function moveCard(card: DeckCard, horizon: Horizon) {
     if (card.horizon === horizon) return;
     await guard(() =>
@@ -154,10 +178,7 @@ export function useDeck(api: VaultApi): Deck {
   async function saveCardNotes(card: DeckCard, notes: string) {
     if (notes === card.notes) return;
     await guard(() =>
-      api.updateNote(card.id, {
-        content: cardContent(card.text, notes),
-        ifUpdatedAt: updatedAt(card.id),
-      }),
+      api.updateNote(card.id, { content: cardContent(card.text, notes), ifUpdatedAt: updatedAt(card.id) }),
     );
   }
 
@@ -175,27 +196,42 @@ export function useDeck(api: VaultApi): Deck {
     );
   }
 
-  // Newest at the top of the pile.
   async function appendRunning(text: string) {
     const body = text.trim();
     if (!body || !runningId) return;
     const next = runningContent.trim() ? `- ${body}\n${runningContent.replace(/^\s+/, "")}` : `- ${body}\n`;
-    try {
-      const updated = await api.updateNote(runningId, { content: next, ifUpdatedAt: runningUpdatedAt });
-      setRunningContent(updated.content ?? next);
-      setRunningUpdatedAt(updated.updatedAt);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      await reload();
-    }
+    await writeNote(runningId, next, runningUpdatedAt, setRunningContent, setRunningUpdatedAt);
   }
 
   async function writeRunning(text: string) {
     if (!runningId || text === runningContent) return;
+    await writeNote(runningId, text, runningUpdatedAt, setRunningContent, setRunningUpdatedAt);
+  }
+
+  async function saveScratch(text: string) {
+    if (!scratchId || text === scratchContent) return;
+    await writeNote(scratchId, text, scratchUpdatedAt, setScratchContent, setScratchUpdatedAt);
+  }
+
+  async function appendScratch(text: string) {
+    const body = text.trim();
+    if (!body || !scratchId) return;
+    const next = scratchContent.trim() ? `${scratchContent.replace(/\s+$/, "")}\n${body}\n` : `${body}\n`;
+    await writeNote(scratchId, next, scratchUpdatedAt, setScratchContent, setScratchUpdatedAt);
+  }
+
+  // Shared note-content writer with local-state sync + conflict recovery.
+  async function writeNote(
+    id: string,
+    content: string,
+    prevUpdated: string | undefined,
+    setContent: (s: string) => void,
+    setUpdated: (s: string | undefined) => void,
+  ) {
     try {
-      const updated = await api.updateNote(runningId, { content: text, ifUpdatedAt: runningUpdatedAt });
-      setRunningContent(updated.content ?? text);
-      setRunningUpdatedAt(updated.updatedAt);
+      const updated = await api.updateNote(id, { content, ifUpdatedAt: prevUpdated });
+      setContent(updated.content ?? content);
+      setUpdated(updated.updatedAt);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       await reload();
@@ -226,24 +262,27 @@ export function useDeck(api: VaultApi): Deck {
     await guard(() => touch(note));
   }
 
-  // The sketchpad for a project: a small note linked by metadata.project. Found
-  // or created on demand; it does NOT trigger a deck reload.
-  async function loadSketch(project: Note): Promise<Note> {
-    const sketches = await api.queryNotes({ tag: SKETCH_TAG, includeContent: true, limit: 100 });
-    const found = sketches.find((s) => String(s.metadata?.project) === project.id);
-    if (found) return found;
-    const title = projectTitle(project);
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "project";
-    return api.createNote({
-      path: `deck/sketch/${slug}-${Math.random().toString(36).slice(2, 6)}`,
-      content: "",
-      tags: [SKETCH_TAG],
-      metadata: { project: project.id },
-    });
+  async function addProject(name: string) {
+    const n = name.trim();
+    if (!n) return;
+    await guard(() =>
+      api.createNote({
+        path: `projects/${slug(n)}`,
+        content: `# ${n}\n\n## Where it's at\n\n## Next steps\n`,
+        tags: [PROJECT_TAG],
+        metadata: {},
+      }),
+    );
   }
 
-  function saveSketch(id: string, content: string): Promise<Note> {
+  function saveWall(id: string, content: string): Promise<Note> {
     return api.updateNote(id, { content });
+  }
+
+  function findDeep(wall: Note): Note | null {
+    const deep = wall.metadata?.deep;
+    if (!deep) return null;
+    return deepNotes.find((n) => n.id === String(deep)) ?? null;
   }
 
   return {
@@ -253,6 +292,7 @@ export function useDeck(api: VaultApi): Deck {
     cards,
     projects,
     runningContent,
+    scratchContent,
     events,
     looseEnd: looseEnds[0] ?? null,
     reload,
@@ -266,8 +306,11 @@ export function useDeck(api: VaultApi): Deck {
     writeRunning,
     handleLooseEnd,
     dismissLooseEnd,
-    loadSketch,
-    saveSketch,
+    addProject,
+    saveWall,
+    findDeep,
+    saveScratch,
+    appendScratch,
   };
 }
 
@@ -275,17 +318,36 @@ function ts(s?: string): number {
   return s ? Date.parse(s) : 0;
 }
 
+function slug(text: string): string {
+  return (
+    text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "project"
+  ) + "-" + Math.random().toString(36).slice(2, 6);
+}
+
 export function looseEndLabel(note: Note): string {
   const m = (note.content ?? "").match(/^#[ \t]+(.+?)[ \t]*$/m);
   return (m ? m[1] : note.title).replace(/\*\*/g, "").trim();
 }
 
-// Read deck cards by querying each horizon sub-tag directly. The parent `deck`
-// tag does NOT roll its children up on this vault, so a `tag: deck` query
-// returns nothing — we ask for the exact tags we wrote.
+async function ensureWalls(api: VaultApi, walls: Note[], deepNotes: Note[]): Promise<Note[]> {
+  const linked = new Set(walls.map((w) => String(w.metadata?.deep)).filter((x) => x && x !== "undefined"));
+  const created: Note[] = [];
+  for (const deep of deepNotes) {
+    if (linked.has(deep.id)) continue;
+    const name = projectTitle(deep);
+    created.push(
+      await api.createNote({
+        path: `projects/${slug(name)}`,
+        content: `# ${name}\n\n## Where it's at\n\n## Next steps\n`,
+        tags: [PROJECT_TAG],
+        metadata: { deep: deep.id },
+      }),
+    );
+  }
+  return [...walls, ...created];
+}
+
 async function loadDeckCards(api: VaultApi): Promise<Note[]> {
-  // Query the flat `deck` tag (current shape) plus the older `deck/<horizon>`
-  // sub-tags so existing cards still load. Merge by id.
   const tags = [DECK_TAG, ...HORIZONS.map((h) => deckTag(h.key))];
   const lists = await Promise.all(
     tags.map((t) => api.queryNotes({ tag: t, includeContent: true, limit: 200 })),
@@ -309,14 +371,14 @@ async function findByTag(api: VaultApi, tag: string): Promise<Note | null> {
   return matches.find((n) => n.tags.includes(tag)) ?? null;
 }
 
-async function loadOrCreateRunning(api: VaultApi): Promise<Note> {
-  const existing = await findByTag(api, RUNNING_TAG);
+async function loadOrCreate(api: VaultApi, tag: string, path: string): Promise<Note> {
+  const existing = await findByTag(api, tag);
   if (existing) return existing;
   try {
-    return await api.createNote({ path: RUNNING_PATH, content: "", tags: [RUNNING_TAG], metadata: {} });
+    return await api.createNote({ path, content: "", tags: [tag], metadata: {} });
   } catch (e) {
     if (e instanceof ApiError && (e.status === 409 || e.conflict)) {
-      const again = await findByTag(api, RUNNING_TAG);
+      const again = await findByTag(api, tag);
       if (again) return again;
     }
     throw e;

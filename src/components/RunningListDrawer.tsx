@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { inlineText } from "../deck";
+import { pileLines } from "../deck";
 import type { Horizon } from "../types";
 
 // The pile. The flick (pile → day) is the heartbeat of the whole app, so it's
@@ -24,10 +24,7 @@ export function RunningListDrawer({
   const [text, setText] = useState(content);
   const [pulled, setPulled] = useState<Set<string>>(new Set());
 
-  const items = text
-    .split(/\r?\n/)
-    .map((l) => inlineText(l.replace(/^[-*]\s+\[[ xX]\]\s+/, "").replace(/^[-*]\s+/, "")))
-    .filter((l) => l);
+  const items = pileLines(text);
 
   function flick(horizon: Horizon, line: string) {
     onPull(horizon, line);

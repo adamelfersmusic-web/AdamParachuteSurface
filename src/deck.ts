@@ -61,6 +61,17 @@ export function cardContent(title: string, notes: string): string {
   return body ? `# ${title}\n\n${body}\n` : `# ${title}\n`;
 }
 
+// Parse a pile / running-list note into clean, flickable task lines — skipping
+// section headers, separators, and italic notes so the flick list stays calm.
+export function pileLines(content: string): string[] {
+  return content
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !/^#{1,6}\s/.test(l) && l !== "---" && !/^\*.*\*$/.test(l))
+    .map((l) => inlineText(l.replace(/^[-*]\s+\[[ xX]\]\s+/, "").replace(/^[-*]\s+/, "")))
+    .filter(Boolean);
+}
+
 function boolMeta(v: unknown): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v === "string") return v.toLowerCase() === "true";

@@ -13,13 +13,15 @@ import { ConfigScreen } from "./components/ConfigScreen";
 import { DeckView } from "./components/DeckView";
 import { RightNow, type NowTask } from "./components/RightNow";
 import { ProjectsView } from "./components/ProjectsView";
-import { ProjectSketch } from "./components/ProjectSketch";
+import { ProjectWall } from "./components/ProjectWall";
 import { ProjectNote } from "./components/ProjectNote";
 import { HorizonFocus } from "./components/HorizonFocus";
 import { CaptureFab, type CaptureMode } from "./components/CaptureFab";
 import { RunningListDrawer } from "./components/RunningListDrawer";
 import { TimeStrip } from "./components/TimeStrip";
 import { QuietLine } from "./components/QuietLine";
+import { WorkspaceView } from "./components/WorkspaceView";
+import { ScratchpadView } from "./components/ScratchpadView";
 import { useDeck } from "./useDeck";
 import type { DeckCard } from "./deck";
 import type { AuthSession, Horizon, Note } from "./types";
@@ -147,7 +149,14 @@ export function App() {
   );
 }
 
-type ViewId = "deck" | "now" | "projects";
+type ViewId = "deck" | "now" | "projects" | "workspace" | "scratch";
+const NAV: { id: ViewId; label: string }[] = [
+  { id: "deck", label: "Deck" },
+  { id: "now", label: "Right Now" },
+  { id: "projects", label: "Projects" },
+  { id: "workspace", label: "Workspace" },
+  { id: "scratch", label: "Scratch" },
+];
 
 function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () => void }) {
   const api = useMemo(() => new VaultApi(auth), [auth]);
@@ -159,37 +168,24 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
   const [nowTask, setNowTask] = useState<NowTask | null>(null);
   const [focusHorizon, setFocusHorizon] = useState<Horizon | null>(null);
   const [openProject, setOpenProject] = useState<Note | null>(null);
-  const [sketch, setSketch] = useState<Note | null>(null);
   const [deepOpen, setDeepOpen] = useState(false);
 
-  // When a project opens, load its sketchpad (the calm default layer).
   useEffect(() => {
-    let live = true;
-    if (!openProject) {
-      setSketch(null);
-      setDeepOpen(false);
-      return;
-    }
-    setSketch(null);
-    d.loadSketch(openProject).then((s) => {
-      if (live) setSketch(s);
-    });
-    return () => {
-      live = false;
-    };
-  }, [openProject, d]);
+    if (!openProject) setDeepOpen(false);
+  }, [openProject]);
 
   function setNow(card: DeckCard) {
     setNowTask({ text: card.text, cardId: card.id });
     setFocusHorizon(null);
     setView("now");
   }
-
   function flickNow(text: string) {
     setNowTask({ text });
     setOpenProject(null);
     setView("now");
   }
+
+  const deep = openProject ? d.findDeep(openProject) : null;
 
   return (
     <div className="app">
@@ -200,17 +196,17 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
         </div>
         <div className="topbar-right">
           <nav className="nav">
-            {(["deck", "now", "projects"] as const).map((v) => (
+            {NAV.map((n) => (
               <button
-                key={v}
-                className={`nav-btn${view === v ? " active" : ""}`}
-                onClick={() => setView(v)}
+                key={n.id}
+                className={`nav-btn${view === n.id ? " active" : ""}`}
+                onClick={() => setView(n.id)}
               >
-                {v === "deck" ? "Deck" : v === "now" ? "Right Now" : "Projects"}
+                {n.label}
               </button>
             ))}
           </nav>
-          <button className="icon-btn" title="Running list" onClick={() => setDrawerOpen(true)}>≡</button>
+          <button className="icon-btn" title="The pile" onClick={() => setDrawerOpen(true)}>≡</button>
           <button className="icon-btn" title="Refresh" onClick={d.reload}>↻</button>
           <button className="icon-btn" title="Disconnect" onClick={onDisconnect}>⏻</button>
         </div>
@@ -227,32 +223,21 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
         {view === "deck" && (
           <>
             <TimeStrip events={d.events} />
-            <QuietLine
-              note={d.looseEnd}
-              onHandle={d.handleLooseEnd}
-              onDismiss={d.dismissLooseEnd}
-            />
+            <QuietLine note={d.looseEnd} onHandle={d.handleLooseEnd} onDismiss={d.dismissLooseEnd} />
             <div className="deck-toolbar">
-              <button className="pile-open" onClick={() => setDrawerOpen(true)}>
-                ↧ Flick from the pile
-              </button>
+              <button className="pile-open" onClick={() => setDrawerOpen(true)}>↧ Flick from the pile</button>
             </div>
             <DeckView d={d} setNow={setNow} openHorizon={setFocusHorizon} />
-            <p className="held-foot">
-              Everything you've captured is held in your vault — the deck is only what you chose.
-            </p>
+            <p className="held-foot">Everything you've captured is held in your vault — the deck is only what you chose.</p>
           </>
         )}
         {view === "now" && <RightNow d={d} nowTask={nowTask} setNowTask={setNowTask} />}
-        {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} />}
+        {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} onAdd={d.addProject} />}
+        {view === "workspace" && <WorkspaceView d={d} />}
+        {view === "scratch" && <ScratchpadView content={d.scratchContent} onSave={d.saveScratch} />}
       </main>
 
-      <CaptureFab
-        mode={captureMode}
-        setMode={setCaptureMode}
-        onDump={d.createCapture}
-        onTodo={d.appendRunning}
-      />
+      <CaptureFab mode={captureMode} setMode={setCaptureMode} onDump={d.createCapture} onTodo={d.appendRunning} />
 
       {drawerOpen && (
         <RunningListDrawer
@@ -264,29 +249,25 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
       )}
 
       {focusHorizon && (
-        <HorizonFocus
-          d={d}
-          horizon={focusHorizon}
-          setNow={setNow}
-          onClose={() => setFocusHorizon(null)}
-        />
+        <HorizonFocus d={d} horizon={focusHorizon} setNow={setNow} onClose={() => setFocusHorizon(null)} />
       )}
 
       {openProject && (
-        <ProjectSketch
-          project={openProject}
-          sketch={sketch}
-          onSave={(content) => sketch && d.saveSketch(sketch.id, content).then(setSketch)}
+        <ProjectWall
+          wall={openProject}
+          deep={deep}
+          onSaveWall={(content) => d.saveWall(openProject.id, content)}
           onFlickToday={(text) => d.addCard("today", text)}
           onFlickNow={flickNow}
+          onCapture={(h, text) => d.addCard(h, text)}
           onOpenDeep={() => setDeepOpen(true)}
           onClose={() => setOpenProject(null)}
         />
       )}
 
-      {openProject && deepOpen && (
+      {openProject && deepOpen && deep && (
         <ProjectNote
-          note={openProject}
+          note={deep}
           onClose={() => setDeepOpen(false)}
           onPullNow={flickNow}
           onPullDeck={(text) => d.addCard("today", text)}
