@@ -6,7 +6,7 @@ import type { Deck } from "../useDeck";
 // The morning sorting room — the one room allowed to be denser, because pile +
 // canvas + tier-targets are ONE motion: pull → arrange → commit. Tap a pile line
 // to pull it into the canvas; tap a canvas line's tier button to commit it.
-export function WorkspaceView({ d }: { d: Deck }) {
+export function WorkspaceView({ d, onNow }: { d: Deck; onNow: (text: string) => void }) {
   const pile = pileLines(d.runningContent);
   const [text, setText] = useState(d.scratchContent);
   const dirty = useRef(false);
@@ -65,6 +65,7 @@ export function WorkspaceView({ d }: { d: Deck }) {
                 <div key={i} className="ws-commit-row">
                   <span className="ws-commit-text">{line}</span>
                   <span className="ws-commit-targets">
+                    <button className="now-pill" onClick={() => onNow(line)}>→ Now</button>
                     {TIERS.map((t) => (
                       <button key={t.key} onClick={() => d.addCard(t.key, line)}>→ {t.label}</button>
                     ))}

@@ -11,7 +11,7 @@ import {
 } from "./oauth";
 import { ConfigScreen } from "./components/ConfigScreen";
 import { DeckView } from "./components/DeckView";
-import { RightNow, type NowTask } from "./components/RightNow";
+import { RightNow } from "./components/RightNow";
 import { ProjectsView } from "./components/ProjectsView";
 import { ProjectWall } from "./components/ProjectWall";
 import { ProjectNote } from "./components/ProjectNote";
@@ -134,7 +134,6 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
   const [view, setView] = useState<ViewId>("deck");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>(null);
-  const [nowTask, setNowTask] = useState<NowTask | null>(null);
   const [openProject, setOpenProject] = useState<Note | null>(null);
   const [deepOpen, setDeepOpen] = useState(false);
 
@@ -142,13 +141,15 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
     if (!openProject) setDeepOpen(false);
   }, [openProject]);
 
+  // Promote anything to the one persistent Do Now, and go focus it.
   function focus(card: DeckCard) {
-    setNowTask({ text: card.text, cardId: card.id });
+    d.promoteNow(card);
     setView("now");
   }
-  function flickNow(text: string) {
-    setNowTask({ text });
+  function nowText(text: string) {
+    d.promoteNowText(text);
     setOpenProject(null);
+    setDrawerOpen(false);
     setView("now");
   }
 
@@ -191,10 +192,10 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
             <p className="held-foot">Everything you've captured is held in your vault — the deck is only what you chose.</p>
           </>
         )}
-        {view === "now" && <RightNow d={d} nowTask={nowTask} setNowTask={setNowTask} />}
+        {view === "now" && <RightNow d={d} />}
         {view === "projects" && <ProjectsView projects={d.projects} onOpen={setOpenProject} onAdd={d.addProject} />}
         {view === "calendar" && <CalendarView days={d.calendarDays} events={d.events} onSetDay={d.setCalendarDay} />}
-        {view === "workspace" && <WorkspaceView d={d} />}
+        {view === "workspace" && <WorkspaceView d={d} onNow={nowText} />}
         {view === "scratch" && <ScratchpadView content={d.scratchContent} onSave={d.saveScratch} />}
       </main>
 
@@ -206,6 +207,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
           onWrite={d.writeRunning}
           onClose={() => setDrawerOpen(false)}
           onPull={(tier, text) => d.addCard(tier, text)}
+          onNow={nowText}
         />
       )}
 
@@ -215,7 +217,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
           deep={deep}
           onSaveWall={(content) => d.saveWall(openProject.id, content)}
           onFlickDeck={(text) => d.addCard("move", text, "today")}
-          onFlickNow={flickNow}
+          onFlickNow={nowText}
           onCapture={(tier, text) => d.addCard(tier, text)}
           onOpenDeep={() => setDeepOpen(true)}
           onClose={() => setOpenProject(null)}
@@ -226,7 +228,7 @@ function DeckApp({ auth, onDisconnect }: { auth: AuthManager; onDisconnect: () =
         <ProjectNote
           note={deep}
           onClose={() => setDeepOpen(false)}
-          onPullNow={flickNow}
+          onPullNow={nowText}
           onPullDeck={(text) => d.addCard("move", text, "today")}
         />
       )}

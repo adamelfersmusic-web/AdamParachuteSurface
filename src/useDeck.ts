@@ -33,6 +33,7 @@ export interface Deck {
   error: string | null;
   clearError: () => void;
   cards: DeckCard[];
+  nowCard: DeckCard | null; // the current persistent "Do Now"
   projects: Note[];
   runningContent: string;
   scratchContent: string;
@@ -48,6 +49,11 @@ export interface Deck {
   removeCard: (card: DeckCard) => Promise<void>;
   saveCardText: (card: DeckCard, text: string) => Promise<void>;
   saveCardNotes: (card: DeckCard, notes: string) => Promise<void>;
+  // Do Now — promote anything to the one focus task; persists until done/replaced.
+  promoteNow: (card: DeckCard) => Promise<void>;
+  promoteNowText: (text: string) => Promise<void>;
+  markNowDone: (card: DeckCard) => Promise<void>;
+  clearNow: (card: DeckCard) => Promise<void>;
 
   createCapture: (text: string) => Promise<void>;
   appendRunning: (text: string) => Promise<void>;
@@ -206,6 +212,48 @@ export function useDeck(api: VaultApi): Deck {
     );
   }
 
+  // Clear the `now` flag from whatever currently holds it (at most a couple).
+  async function clearAllNow(exceptId?: string) {
+    for (const c of cards) {
+      if (c.now && c.id !== exceptId) {
+        await api.updateNote(c.id, { metadata: { now: false }, ifUpdatedAt: updatedAt(c.id) });
+      }
+    }
+  }
+
+  async function promoteNow(card: DeckCard) {
+    await guard(async () => {
+      await clearAllNow(card.id);
+      await api.updateNote(card.id, { metadata: { now: true }, ifUpdatedAt: updatedAt(card.id) });
+    });
+  }
+
+  async function promoteNowText(text: string) {
+    const body = text.trim();
+    if (!body) return;
+    await guard(async () => {
+      await clearAllNow();
+      await api.createNote({
+        path: deckPath(body),
+        content: `# ${body}\n`,
+        tags: [DECK_TAG],
+        metadata: { tier: "must", horizon: "today", done: false, now: true, order: Date.now() },
+      });
+    });
+  }
+
+  async function markNowDone(card: DeckCard) {
+    await guard(() =>
+      api.updateNote(card.id, { metadata: { done: true, now: false }, ifUpdatedAt: updatedAt(card.id) }),
+    );
+  }
+
+  async function clearNow(card: DeckCard) {
+    await guard(() =>
+      api.updateNote(card.id, { metadata: { now: false }, ifUpdatedAt: updatedAt(card.id) }),
+    );
+  }
+
   async function createCapture(text: string) {
     const body = text.trim();
     if (!body) return;
@@ -316,6 +364,7 @@ export function useDeck(api: VaultApi): Deck {
     error,
     clearError: () => setError(null),
     cards,
+    nowCard: cards.find((c) => c.now && !c.done) ?? null,
     projects,
     runningContent,
     scratchContent,
@@ -330,6 +379,10 @@ export function useDeck(api: VaultApi): Deck {
     removeCard,
     saveCardText,
     saveCardNotes,
+    promoteNow,
+    promoteNowText,
+    markNowDone,
+    clearNow,
     createCapture,
     appendRunning,
     writeRunning,

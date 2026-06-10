@@ -10,11 +10,13 @@ export function RunningListDrawer({
   onWrite,
   onClose,
   onPull,
+  onNow,
 }: {
   content: string;
   onWrite: (text: string) => void;
   onClose: () => void;
   onPull: (tier: Tier, text: string) => void;
+  onNow: (text: string) => void;
 }) {
   const [text, setText] = useState(content);
   const [pulled, setPulled] = useState<Set<string>>(new Set());
@@ -43,6 +45,7 @@ export function RunningListDrawer({
               <div key={i} className={`flick-row${done ? " pulled" : ""}`}>
                 <span className="flick-text">{done ? "✓ " : ""}{line}</span>
                 <span className="flick-tiers">
+                  <button className="flick-tier now-pill" onClick={() => onNow(line)} title="Do this now">→ Now</button>
                   {TIERS.map((t) => (
                     <button key={t.key} className="flick-tier" onClick={() => flick(t.key, line)} title={`Flick into ${t.label}`}>
                       {t.label}

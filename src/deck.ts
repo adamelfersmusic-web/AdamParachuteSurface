@@ -18,6 +18,7 @@ export interface DeckCard {
   tier: Tier; // primary: move / must / errand
   horizon: Horizon; // secondary time chip: today / week / later
   done: boolean;
+  now: boolean; // the single current "Do Now" — persists until done or replaced
   order: number;
   createdAt: number;
   notes: string; // scratch space for working the task, stored below the H1
@@ -100,6 +101,7 @@ export function cardFromNote(note: Note): DeckCard {
     tier: tierOf(note),
     horizon: horizonOf(note),
     done: boolMeta(note.metadata?.done),
+    now: boolMeta(note.metadata?.now),
     order: orderOf(note),
     createdAt: note.createdAt ? Date.parse(note.createdAt) : 0,
     notes: cardNotesBody(note.content ?? ""),

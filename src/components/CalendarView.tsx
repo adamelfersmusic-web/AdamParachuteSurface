@@ -52,6 +52,9 @@ export function CalendarView({
 
   return (
     <div className="cal">
+      <a className="gcal-link" href="https://calendar.google.com" target="_blank" rel="noreferrer">
+        🗓 Open Google Calendar — add & invite for real ↗
+      </a>
       <div className="cal-head">
         <button className="cal-nav" onClick={() => step(-1)} aria-label="Previous month">‹</button>
         <h2>{MONTHS[month]} {year}</h2>
